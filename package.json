@@ -1,0 +1,51 @@
+{
+  "name": "@eagleway/ota-cli",
+  "version": "0.1.0",
+  "description": "CLI and SDK for ota-api",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "ota-cli": "./dist/cli.cjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "commander": "^12.1.0",
+    "form-data": "^4.0.2",
+    "jiti": "^2.4.2",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2"
+  },
+  "peerDependencies": {
+    "axios": ">=1 <2"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/node": "^22.14.1",
+    "@types/prompts": "^2.4.9",
+    "axios": ">=1 <2",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2"
+  }
+}
