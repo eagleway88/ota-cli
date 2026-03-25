@@ -268,5 +268,6 @@ const version = await client.version.check({
 
 ```bash
 npm run build
-npm publish
+# 带 Scope 的包默认是私有的，直接发布可能会失败，需要添加 --access public 参数
+npm publish --access public
 ```
