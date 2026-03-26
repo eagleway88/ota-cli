@@ -49,6 +49,8 @@ export interface NotifyPayload {
 
 export type PlatformType = 'ios' | 'android' | 'windows' | 'linux' | 'macos'
 export type UpdateType = 'full' | 'hot'
+export const APP_ERROR_KINDS = ['crash', 'error'] as const
+export type AppErrorKind = 'crash' | 'error'
 
 export interface VersionRecord {
   id?: number
@@ -87,6 +89,24 @@ export interface StatusPayload {
 
 export interface ErrorPayload extends StatusPayload {
   message: string
+}
+
+export interface AppErrorPayload {
+  name: string
+  platform: PlatformType
+  ver: number
+  username?: string
+  extras?: string | Record<string, unknown>
+  kind: AppErrorKind
+  message: string
+  stack?: string
+}
+
+export interface CaptureAppErrorPayload extends Omit<AppErrorPayload, 'message' | 'stack' | 'kind'> {
+  error: unknown
+  kind?: AppErrorKind
+  message?: string
+  stack?: string
 }
 
 export interface SuccessPayload extends StatusPayload {}

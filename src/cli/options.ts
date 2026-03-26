@@ -69,3 +69,14 @@ export interface VersionErrorCommandOptions extends GlobalCliOptions {
   extras?: string
   message: string
 }
+
+export interface VersionAppErrorCommandOptions extends GlobalCliOptions {
+  name: string
+  platform: string
+  ver: string
+  username?: string
+  extras?: string
+  kind: string
+  message: string
+  stack?: string
+}

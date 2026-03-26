@@ -1,7 +1,8 @@
 import { Command } from 'commander'
-import { createOtaClient, check, error, success } from './client'
+import { appError, createOtaClient, check, error, success } from './client'
 import { OtaApiError } from './http'
-import type { ErrorPayload, OtaCliConfig } from './types'
+import { APP_ERROR_KINDS } from './types'
+import type { AppErrorKind, AppErrorPayload, ErrorPayload, OtaCliConfig } from './types'
 import { clearCachedSession, writeCachedSession } from './cli/cache'
 import { loadCliConfig } from './cli/config'
 import { resolveAuthToken, stripCredentials } from './cli/auth'
@@ -11,6 +12,7 @@ import type {
   NotifySendCommandOptions,
   VersionCheckCommandOptions,
   VersionCreateCommandOptions,
+  VersionAppErrorCommandOptions,
   VersionErrorCommandOptions,
   VersionSuccessCommandOptions,
   VersionUploadCommandOptions
@@ -76,6 +78,14 @@ async function withProtectedAuth<T>(
 
 function isUnauthorizedError(error: unknown) {
   return error instanceof OtaApiError && (error.status === 401 || error.status === 403)
+}
+
+function parseAppErrorKind(kind: string): AppErrorKind {
+  if (APP_ERROR_KINDS.includes(kind as AppErrorKind)) {
+    return kind as AppErrorKind
+  }
+
+  throw new Error(`kind must be one of: ${APP_ERROR_KINDS.join(', ')}`)
 }
 
 async function run() {
@@ -297,6 +307,35 @@ async function run() {
           return error(resolved, payload)
         })
         logJson('error reported', result)
+      }))
+  )
+
+  withGlobalOptions(
+    version.command('app-error')
+      .requiredOption('--name <name>', 'app name')
+      .requiredOption('--platform <platform>', 'platform')
+      .requiredOption('--ver <ver>', 'version number')
+      .requiredOption('--kind <kind>', 'error kind: crash or error')
+      .requiredOption('--message <message>', 'error message')
+      .option('--stack <stack>', 'error stack')
+      .option('--username <username>', 'username')
+      .option('--extras <json>', 'extras payload as JSON string')
+      .action(async (options: VersionAppErrorCommandOptions) => withConfig(async config => {
+        const payload: AppErrorPayload = {
+          name: options.name,
+          platform: options.platform as never,
+          ver: Number(options.ver),
+          kind: parseAppErrorKind(options.kind),
+          message: options.message,
+          stack: options.stack,
+          username: options.username,
+          extras: options.extras ? parseJsonInput(options.extras, {}) : undefined
+        }
+        const resolved = resolveCliOptions(options, config)
+        const result = await runLogged('reporting application error', async () => {
+          return appError(resolved, payload)
+        })
+        logJson('application error reported', result)
       }))
   )
 

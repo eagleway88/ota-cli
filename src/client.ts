@@ -1,6 +1,8 @@
 import { apiRequest } from './http'
 import type {
   AdminCredentials,
+  AppErrorPayload,
+  CaptureAppErrorPayload,
   CheckPayload,
   CreatePayload,
   ErrorPayload,
@@ -52,6 +54,11 @@ export function createOtaClient(options: RequestOptions) {
         method: 'POST',
         url: '/version/error',
         data: body
+      }),
+      appError: (body: AppErrorPayload) => apiRequest<Record<string, unknown>>(options, {
+        method: 'POST',
+        url: '/version/app-error',
+        data: body
       })
     }
   }
@@ -67,6 +74,54 @@ export async function success(options: RequestOptions, body: SuccessPayload) {
 
 export async function error(options: RequestOptions, body: ErrorPayload) {
   return createOtaClient(options).version.error(body)
+}
+
+export async function appError(options: RequestOptions, body: AppErrorPayload) {
+  return createOtaClient(options).version.appError(body)
+}
+
+export async function captureAppError(options: RequestOptions, body: CaptureAppErrorPayload) {
+  const normalizedError = normalizeUnknownAppError(body.error)
+
+  return appError(options, {
+    name: body.name,
+    platform: body.platform,
+    ver: body.ver,
+    username: body.username,
+    extras: body.extras,
+    kind: body.kind ?? 'error',
+    message: body.message ?? normalizedError.message,
+    stack: body.stack ?? normalizedError.stack
+  })
+}
+
+function normalizeUnknownAppError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message || error.name || 'Unknown error',
+      stack: error.stack
+    }
+  }
+
+  if (typeof error === 'string') {
+    return {
+      message: error,
+      stack: undefined
+    }
+  }
+
+  return {
+    message: stringifyUnknownError(error),
+    stack: undefined
+  }
+}
+
+function stringifyUnknownError(error: unknown) {
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
 }
 
 export type { UploadPayload }

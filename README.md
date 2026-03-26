@@ -5,7 +5,7 @@
 ## 能力
 
 - 通过命令行调用 ota-api 的全部现有接口
-- 导出 `check`、`success`、`error` 三个 SDK 方法，兼容 React Native、Electron Renderer、Electron Main
+- 导出 `check`、`success`、`error`、`appError`、`captureAppError` 五个 SDK 方法，兼容 React Native、Electron Renderer、Electron Main
 - 支持 `ota-cli.config.ts` 配置文件
 - 支持受保护接口自动登录换取 token
 - 支持 ESM、CommonJS、TypeScript 类型声明
@@ -183,6 +183,23 @@ ota-cli version error \
   --extras '{"device":"iphone"}'
 ```
 
+上报应用闪退或运行时报错：
+
+```bash
+ota-cli version app-error \
+  --name app-demo \
+  --platform ios \
+  --ver 101 \
+  --kind crash \
+  --message "app crashed on startup" \
+  --stack "Error: crash\n    at bootstrap (index.bundle:1:100)" \
+  --extras '{"device":"iphone","osVersion":"18.0"}'
+```
+
+说明：
+
+- `--kind` 只接受 `crash` 或 `error`
+
 更新已有错误记录：
 
 ```bash
@@ -200,7 +217,7 @@ ota-cli version error \
 ### React Native / Electron
 
 ```ts
-import { check, success, error } from '@eagleway/ota-cli'
+import { appError, captureAppError, check, success, error } from '@eagleway/ota-cli'
 
 const baseURL = 'http://127.0.0.1:3001'
 
@@ -235,6 +252,35 @@ await error(
     ver: 101,
     verId: 12,
     message: 'apply patch failed',
+    extras: {
+      device: 'iphone'
+    }
+  }
+)
+
+await appError(
+  { baseURL },
+  {
+    name: 'app-demo',
+    platform: 'ios',
+    ver: 101,
+    kind: 'crash',
+    message: 'app crashed on startup',
+    stack: 'Error: crash\n    at bootstrap (index.bundle:1:100)',
+    extras: {
+      device: 'iphone'
+    }
+  }
+)
+
+await captureAppError(
+  { baseURL },
+  {
+    name: 'app-demo',
+    platform: 'ios',
+    ver: 101,
+    kind: 'error',
+    error: new Error('network request failed'),
     extras: {
       device: 'iphone'
     }
