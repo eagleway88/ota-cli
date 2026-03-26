@@ -69,7 +69,7 @@ export default config
 - 登录成功后会把 token 缓存到本机，后续受保护命令优先复用缓存
 - 如果接口返回 `401` 或 `403`，CLI 会自动清除本机缓存 token，并重新登录后重试一次受保护请求
 - `OtaCliConfig` 支持 `CreatePayload` 的所有可选字段，`create` 和 `upload` 会优先使用命令行参数，其次回退到配置文件
-- `iosPath`、`androidPath`、`windowsPath`、`linuxPath`、`macPath` 用于 `upload` 自动选择上传文件
+- `iosPath`、`androidPath`、`windowsPath`、`linuxPath`、`macosPath` 用于 `upload` 自动选择上传文件
 - `upload` 优先按 `--platform` 拆分后的平台顺序匹配对应 `*Path`，如果没有传 `--platform`，则按当前命令行运行环境匹配
 - `upload` 只接受 `.zip` 文件或目录：
 - 如果是 `.zip` 文件则直接上传

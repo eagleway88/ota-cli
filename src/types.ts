@@ -34,7 +34,7 @@ export interface OtaCliConfig extends Partial<RequestOptions>, Partial<CreatePay
   androidPath?: string
   windowsPath?: string
   linuxPath?: string
-  macPath?: string
+  macosPath?: string
 }
 
 export interface AdminCredentials {
@@ -47,7 +47,7 @@ export interface NotifyPayload {
   data?: unknown
 }
 
-export type PlatformType = 'ios' | 'android' | 'windows' | 'linux' | 'mac'
+export type PlatformType = 'ios' | 'android' | 'windows' | 'linux' | 'macos'
 export type UpdateType = 'full' | 'hot'
 
 export interface VersionRecord {

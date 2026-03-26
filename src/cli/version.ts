@@ -8,10 +8,8 @@ const PLATFORM_PATH_KEYS = {
   android: 'androidPath',
   windows: 'windowsPath',
   linux: 'linuxPath',
-  mac: 'macPath'
+  macos: 'macosPath'
 } as const
-
-type PathKey = typeof PLATFORM_PATH_KEYS[keyof typeof PLATFORM_PATH_KEYS]
 
 export function buildCreatePayload(options: VersionCreateCommandOptions, config: OtaCliConfig): CreatePayload {
   const payload: CreatePayload = {
@@ -124,7 +122,7 @@ function parsePlatformCandidates(platformValue: string | undefined): PlatformTyp
 function detectRuntimePlatform(): PlatformType | undefined {
   switch (process.platform) {
     case 'darwin':
-      return 'mac'
+      return 'macos'
     case 'win32':
       return 'windows'
     case 'linux':
@@ -135,5 +133,5 @@ function detectRuntimePlatform(): PlatformType | undefined {
 }
 
 function isPlatformType(value: string): value is PlatformType {
-  return value === 'ios' || value === 'android' || value === 'windows' || value === 'linux' || value === 'mac'
+  return value === 'ios' || value === 'android' || value === 'windows' || value === 'linux' || value === 'macos'
 }

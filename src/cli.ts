@@ -155,7 +155,7 @@ async function run() {
     version.command('check')
       .requiredOption('--name <name>', 'app name')
       .requiredOption('--ver <ver>', 'current version number')
-      .requiredOption('--platform <platform>', 'ios/android/windows/linux/mac')
+      .requiredOption('--platform <platform>', 'ios/android/windows/linux/macos')
       .option('--channel <channel>', 'channel name')
       .option('--id <id>', 'current version table id')
       .action(async (options: VersionCheckCommandOptions) => withConfig(async config => {
