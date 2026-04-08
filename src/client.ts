@@ -6,7 +6,10 @@ import type {
   CheckPayload,
   CreatePayload,
   ErrorPayload,
-  NotifyPayload,
+  MessageGlobalPayload,
+  MessageOtaNamePayload,
+  MessageUniqueIdPayload,
+  MessageUserIdPayload,
   RequestOptions,
   SuccessPayload,
   UploadPayload,
@@ -14,6 +17,39 @@ import type {
 } from './types'
 
 export function createOtaClient(options: RequestOptions) {
+  const message = {
+    sendGlobal: (body: MessageGlobalPayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/send-global',
+      data: body
+    }),
+    sendOtaName: (body: MessageOtaNamePayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/send-ota-name',
+      data: body
+    }),
+    sendUserId: (body: MessageUserIdPayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/send-user-id',
+      data: body
+    }),
+    sendUniqueId: (body: MessageUniqueIdPayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/send-unique-id',
+      data: body
+    }),
+    clearUserId: (body: MessageUserIdPayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/clear-user-id',
+      data: body
+    }),
+    clearUniqueId: (body: MessageUniqueIdPayload) => apiRequest<string>(options, {
+      method: 'POST',
+      url: '/message/clear-unique-id',
+      data: body
+    })
+  }
+
   return {
     admin: {
       create: (body: AdminCredentials) => apiRequest<{ id: number; username: string }>(options, {
@@ -27,13 +63,7 @@ export function createOtaClient(options: RequestOptions) {
         data: body
       })
     },
-    notify: {
-      send: (body: NotifyPayload) => apiRequest<string>(options, {
-        method: 'POST',
-        url: '/notify/send',
-        data: body
-      })
-    },
+    message,
     version: {
       check: (body: CheckPayload) => apiRequest<VersionRecord | null>(options, {
         method: 'POST',

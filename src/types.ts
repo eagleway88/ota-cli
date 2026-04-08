@@ -42,8 +42,23 @@ export interface AdminCredentials {
   password: string
 }
 
-export interface NotifyPayload {
+export interface MessageGlobalPayload {
   type: string
+  data?: unknown
+}
+
+export interface MessageOtaNamePayload {
+  otaName: string
+  data?: unknown
+}
+
+export interface MessageUserIdPayload {
+  userId: string
+  data?: unknown
+}
+
+export interface MessageUniqueIdPayload {
+  uniqueId: string
   data?: unknown
 }
 

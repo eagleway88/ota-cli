@@ -28,7 +28,7 @@ export async function uploadVersion(
     form.append(key, typeof value === 'string' ? value : JSON.stringify(value))
   }
 
-  const client = createHttpClient(options)
+  const client = createHttpClient({ ...options, timeout: options.timeout ?? 150000 })
   try {
     const response = await client.post('/version/upload', form, {
       headers: form.getHeaders()
@@ -56,7 +56,7 @@ async function prepareUploadSource(filePath: string) {
     logStep(`using zip file directly: ${filePath}`)
     return {
       filePath,
-      cleanup: async () => {}
+      cleanup: async () => { }
     }
   }
 

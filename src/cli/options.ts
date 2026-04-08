@@ -12,9 +12,32 @@ export interface AdminAuthCommandOptions extends GlobalCliOptions {
   password: string
 }
 
-export interface NotifySendCommandOptions extends GlobalCliOptions {
+export interface MessageSendGlobalCommandOptions extends GlobalCliOptions {
   type: string
   data?: string
+}
+
+export interface MessageSendOtaNameCommandOptions extends GlobalCliOptions {
+  otaName: string
+  data?: string
+}
+
+export interface MessageSendUserIdCommandOptions extends GlobalCliOptions {
+  userId: string
+  data?: string
+}
+
+export interface MessageSendUniqueIdCommandOptions extends GlobalCliOptions {
+  uniqueId: string
+  data?: string
+}
+
+export interface MessageClearUserIdCommandOptions extends GlobalCliOptions {
+  userId: string
+}
+
+export interface MessageClearUniqueIdCommandOptions extends GlobalCliOptions {
+  uniqueId: string
 }
 
 export interface VersionCheckCommandOptions extends GlobalCliOptions {

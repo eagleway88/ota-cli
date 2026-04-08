@@ -109,13 +109,47 @@ ota-cli admin create --base-url http://127.0.0.1:3001 --username admin --passwor
 ota-cli admin login --base-url http://127.0.0.1:3001 --username admin --password 123456
 ```
 
-### 通知接口
+### 消息接口
 
-发送通知：
+发送全局通知：
 
 ```bash
-ota-cli notify send --type ota-update --data '{"ver":101}'
+ota-cli message send-global --type ota-update --data '{"ver":101}'
 ```
+
+发送 OTA 名称通知：
+
+```bash
+ota-cli message send-ota-name --ota-name app-demo --data '{"ver":101}'
+```
+
+发送指定用户通知：
+
+```bash
+ota-cli message send-user-id --user-id user-1 --data '{"ver":101}'
+```
+
+发送指定设备通知：
+
+```bash
+ota-cli message send-unique-id --unique-id device-1 --data '{"ver":101}'
+```
+
+清除指定用户通知：
+
+```bash
+ota-cli message clear-user-id --user-id user-1
+```
+
+清除指定设备通知：
+
+```bash
+ota-cli message clear-unique-id --unique-id device-1
+```
+
+说明：
+
+- 新版 ota-api 使用 `message` 路由组
 
 ### 版本接口
 
@@ -301,6 +335,13 @@ const client = createOtaClient({
 const token = await client.admin.login({
   username: 'admin',
   password: '123456'
+})
+
+await client.message.sendGlobal({
+  type: 'ota-update',
+  data: {
+    ver: 101
+  }
 })
 
 const version = await client.version.check({

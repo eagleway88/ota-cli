@@ -9,7 +9,12 @@ import { resolveAuthToken, stripCredentials } from './cli/auth'
 import { logError, logJson, logStep, logSuccess, logWarn } from './cli/logger'
 import type {
   AdminAuthCommandOptions,
-  NotifySendCommandOptions,
+  MessageClearUniqueIdCommandOptions,
+  MessageClearUserIdCommandOptions,
+  MessageSendGlobalCommandOptions,
+  MessageSendOtaNameCommandOptions,
+  MessageSendUniqueIdCommandOptions,
+  MessageSendUserIdCommandOptions,
   VersionCheckCommandOptions,
   VersionCreateCommandOptions,
   VersionAppErrorCommandOptions,
@@ -88,6 +93,10 @@ function parseAppErrorKind(kind: string): AppErrorKind {
   throw new Error(`kind must be one of: ${APP_ERROR_KINDS.join(', ')}`)
 }
 
+function parseOptionalJsonData(value: string | undefined) {
+  return value === undefined ? undefined : parseJsonInput(value, {})
+}
+
 async function run() {
   const program = new Command()
 
@@ -141,22 +150,103 @@ async function run() {
       }))
   )
 
-  const notify = program.command('notify').description('notify APIs')
+  const message = program.command('message').description('message APIs')
   withGlobalOptions(
-    notify.command('send')
+    message.command('send-global')
       .requiredOption('--type <type>', 'notification type')
-      .option('--data <json>', 'notification payload as JSON string', '{}')
-      .action(async (options: NotifySendCommandOptions) => withConfig(async config => {
+      .option('--data <json>', 'notification payload as JSON string')
+      .action(async (options: MessageSendGlobalCommandOptions) => withConfig(async config => {
         const type = options.type
         const resolved = resolveCliOptions(options, config)
         const client = createOtaClient(resolved)
-        const result = await runLogged('sending notification', async () => {
-          return client.notify.send({
+        const result = await runLogged('sending global message', async () => {
+          return client.message.sendGlobal({
             type,
-            data: parseJsonInput(options.data, {})
+            data: parseOptionalJsonData(options.data)
           })
         })
-        logJson('notification sent', result)
+        logJson('message sent', result)
+      }))
+  )
+
+  withGlobalOptions(
+    message.command('send-ota-name')
+      .requiredOption('--ota-name <otaName>', 'ota name')
+      .option('--data <json>', 'notification payload as JSON string')
+      .action(async (options: MessageSendOtaNameCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const client = createOtaClient(resolved)
+        const result = await runLogged('sending ota message', async () => {
+          return client.message.sendOtaName({
+            otaName: options.otaName,
+            data: parseOptionalJsonData(options.data)
+          })
+        })
+        logJson('message sent', result)
+      }))
+  )
+
+  withGlobalOptions(
+    message.command('send-user-id')
+      .requiredOption('--user-id <userId>', 'user id')
+      .option('--data <json>', 'notification payload as JSON string')
+      .action(async (options: MessageSendUserIdCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const client = createOtaClient(resolved)
+        const result = await runLogged('sending user message', async () => {
+          return client.message.sendUserId({
+            userId: options.userId,
+            data: parseOptionalJsonData(options.data)
+          })
+        })
+        logJson('message sent', result)
+      }))
+  )
+
+  withGlobalOptions(
+    message.command('send-unique-id')
+      .requiredOption('--unique-id <uniqueId>', 'unique device id')
+      .option('--data <json>', 'notification payload as JSON string')
+      .action(async (options: MessageSendUniqueIdCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const client = createOtaClient(resolved)
+        const result = await runLogged('sending device message', async () => {
+          return client.message.sendUniqueId({
+            uniqueId: options.uniqueId,
+            data: parseOptionalJsonData(options.data)
+          })
+        })
+        logJson('message sent', result)
+      }))
+  )
+
+  withGlobalOptions(
+    message.command('clear-user-id')
+      .requiredOption('--user-id <userId>', 'user id')
+      .action(async (options: MessageClearUserIdCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const client = createOtaClient(resolved)
+        const result = await runLogged('clearing user message', async () => {
+          return client.message.clearUserId({
+            userId: options.userId
+          })
+        })
+        logJson('message cleared', result)
+      }))
+  )
+
+  withGlobalOptions(
+    message.command('clear-unique-id')
+      .requiredOption('--unique-id <uniqueId>', 'unique device id')
+      .action(async (options: MessageClearUniqueIdCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const client = createOtaClient(resolved)
+        const result = await runLogged('clearing device message', async () => {
+          return client.message.clearUniqueId({
+            uniqueId: options.uniqueId
+          })
+        })
+        logJson('message cleared', result)
       }))
   )
 
