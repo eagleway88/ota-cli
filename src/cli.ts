@@ -256,6 +256,7 @@ async function run() {
       .requiredOption('--name <name>', 'app name')
       .requiredOption('--ver <ver>', 'current version number')
       .requiredOption('--platform <platform>', 'ios/android/windows/linux/macos')
+      .option('--architecture <architecture>', 'target architecture, e.g. arm64 or x64')
       .option('--channel <channel>', 'channel name')
       .option('--id <id>', 'current version table id')
       .action(async (options: VersionCheckCommandOptions) => withConfig(async config => {
@@ -268,6 +269,7 @@ async function run() {
             name,
             ver: Number(ver),
             platform,
+            architecture: options.architecture,
             channel: options.channel,
             id: toOptionalNumber(options.id)
           })
@@ -281,6 +283,7 @@ async function run() {
       .option('--name <name>', 'app name')
       .option('--ver <ver>', 'version number')
       .option('--platform <platform>', 'comma-separated target platforms')
+      .option('--architecture <architecture>', 'comma-separated target architectures')
       .option('--desc <desc>', 'update description')
       .option('--file-size <size>', 'file size')
       .option('--enable <enable>', '1 or 0')
@@ -314,6 +317,7 @@ async function run() {
       .option('--name <name>', 'app name')
       .option('--ver <ver>', 'version number')
       .option('--platform <platform>', 'comma-separated target platforms')
+      .option('--architecture <architecture>', 'comma-separated target architectures')
       .option('--desc <desc>', 'update description')
       .option('--enable <enable>', '1 or 0')
       .option('--mandatory <mandatory>', '1 or 0')

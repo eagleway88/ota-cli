@@ -72,6 +72,7 @@ export interface VersionRecord {
   ver: number
   name: string
   platform: string
+  architecture?: string
   desc?: string
   fileSize?: number
   enable?: number
@@ -89,6 +90,7 @@ export interface CheckPayload {
   ver: number
   name: string
   platform: PlatformType
+  architecture?: string
   channel?: string
 }
 

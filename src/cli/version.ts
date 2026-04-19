@@ -16,6 +16,7 @@ export function buildCreatePayload(options: VersionCreateCommandOptions, config:
     name: options.name || config.name || '',
     ver: Number(options.ver || config.ver),
     platform: options.platform || config.platform || '',
+    architecture: options.architecture ?? config.architecture,
     desc: options.desc ?? config.desc,
     fileSize: toOptionalNumber(options.fileSize) ?? config.fileSize,
     enable: toOptionalNumber(options.enable) ?? config.enable,

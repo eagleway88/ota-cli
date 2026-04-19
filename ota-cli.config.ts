@@ -6,6 +6,7 @@ const config: OtaCliConfig = {
   name: 'app-demo',
   ver: 101,
   platform: 'ios',
+  architecture: 'arm64',
   desc: '1.0.1 update',
   mandatory: 1,
   iosPath: './test/ios',

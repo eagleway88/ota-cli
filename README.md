@@ -40,6 +40,7 @@ const config: OtaCliConfig = {
   name: 'app-demo',
   ver: 101,
   platform: 'ios,android',
+  architecture: 'arm64,x64',
   desc: '1.0.1 update',
   mandatory: 1,
   iosPath: './dist/ios/main.bundle',
@@ -69,6 +70,7 @@ export default config
 - 登录成功后会把 token 缓存到本机，后续受保护命令优先复用缓存
 - 如果接口返回 `401` 或 `403`，CLI 会自动清除本机缓存 token，并重新登录后重试一次受保护请求
 - `OtaCliConfig` 支持 `CreatePayload` 的所有可选字段，`create` 和 `upload` 会优先使用命令行参数，其次回退到配置文件
+- `architecture` 支持逗号分隔多架构，例如 `arm64,x64`
 - `iosPath`、`androidPath`、`windowsPath`、`linuxPath`、`macosPath` 用于 `upload` 自动选择上传文件
 - `upload` 优先按 `--platform` 拆分后的平台顺序匹配对应 `*Path`，如果没有传 `--platform`，则按当前命令行运行环境匹配
 - `upload` 只接受 `.zip` 文件或目录：
@@ -157,6 +159,12 @@ ota-cli message clear-unique-id --unique-id device-1
 
 ```bash
 ota-cli version check --name app-demo --ver 100 --platform ios --channel appstore
+
+也可以带上架构过滤：
+
+```bash
+ota-cli version check --name app-demo --ver 100 --platform ios --architecture arm64 --channel appstore
+```
 ```
 
 创建全量更新：
@@ -166,6 +174,7 @@ ota-cli version create \
   --name app-demo \
   --ver 101 \
   --platform ios,android \
+  --architecture arm64,x64 \
   --desc "1.0.1 full update" \
   --install-url https://cdn.example.com/app-demo-1.0.1.apk \
   --mandatory 1 \
@@ -180,6 +189,7 @@ ota-cli version upload \
   --name app-demo \
   --ver 101 \
   --platform ios,android \
+  --architecture arm64,x64 \
   --desc "1.0.1 hot update" \
   --auth-username admin \
   --auth-password 123456
