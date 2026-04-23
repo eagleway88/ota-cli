@@ -15,10 +15,11 @@ export class OtaApiError extends Error {
   }
 }
 
-// export function normalizeBaseURL(baseURL: string) {
-//   const trimmed = baseURL.trim().replace(/\/+$/, '')
-//   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
-// }
+export function normalizeBaseURL(baseURL: string) {
+  const trimmed = baseURL.trim().replace(/\/+$/, '')
+  // return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
+  return trimmed
+}
 
 export function createHttpClient(options: RequestOptions) {
   const headers: Record<string, string> = { ...(options.headers || {}) }
@@ -27,7 +28,7 @@ export function createHttpClient(options: RequestOptions) {
   }
 
   return axios.create({
-    baseURL: options.baseURL,
+    baseURL: normalizeBaseURL(options.baseURL),
     timeout: options.timeout ?? 15000,
     headers
   })
