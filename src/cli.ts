@@ -151,15 +151,12 @@ async function run() {
   const message = program.command('message').description('message APIs')
   withGlobalOptions(
     message.command('send-global')
-      .requiredOption('--type <type>', 'notification type')
       .option('--data <json>', 'notification payload as JSON string')
       .action(async (options: MessageSendGlobalCommandOptions) => withConfig(async config => {
-        const type = options.type
         const resolved = resolveCliOptions(options, config)
         const client = createOtaClient(resolved)
         const result = await runLogged('sending global message', async () => {
           return client.message.sendGlobal({
-            type,
             data: parseOptionalJsonData(options.data)
           })
         })

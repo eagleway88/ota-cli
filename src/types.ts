@@ -43,7 +43,6 @@ export interface AdminCredentials {
 }
 
 export interface MessageGlobalPayload {
-  type: string
   data?: unknown
 }
 

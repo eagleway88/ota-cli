@@ -118,7 +118,7 @@ ota-cli admin login --base-url http://127.0.0.1:3001 --username admin --password
 发送全局通知：
 
 ```bash
-ota-cli message send-global --type ota-update --data '{"ver":101}'
+ota-cli message send-global --data '{"ver":101}'
 ```
 
 发送 OTA 名称通知：

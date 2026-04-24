@@ -13,7 +13,6 @@ export interface AdminAuthCommandOptions extends GlobalCliOptions {
 }
 
 export interface MessageSendGlobalCommandOptions extends GlobalCliOptions {
-  type: string
   data?: string
 }
 
