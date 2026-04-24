@@ -64,6 +64,22 @@ export interface MessageUniqueIdPayload {
   resend?: boolean
 }
 
+export interface TargetedMessageResult {
+  messageId: string | null
+  data: unknown
+  updatedAt: string
+  expiresAt: string | null
+  ackRequired: boolean
+}
+
+export interface MessageUserIdResult extends TargetedMessageResult {
+  userId: string
+}
+
+export interface MessageUniqueIdResult extends TargetedMessageResult {
+  uniqueId: string
+}
+
 export type PlatformType = 'ios' | 'android' | 'windows' | 'linux' | 'macos'
 export type UpdateType = 'full' | 'hot'
 export const APP_ERROR_KINDS = ['crash', 'error'] as const

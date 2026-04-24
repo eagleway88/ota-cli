@@ -7,8 +7,10 @@ import type {
   CreatePayload,
   ErrorPayload,
   MessageGlobalPayload,
+  MessageUniqueIdResult,
   MessageOtaNamePayload,
   MessageUniqueIdPayload,
+  MessageUserIdResult,
   MessageUserIdPayload,
   RequestOptions,
   SuccessPayload,
@@ -28,24 +30,14 @@ export function createOtaClient(options: RequestOptions) {
       url: '/message/send-ota-name',
       data: body
     }),
-    sendUserId: (body: MessageUserIdPayload) => apiRequest<string>(options, {
+    sendUserId: (body: MessageUserIdPayload) => apiRequest<MessageUserIdResult>(options, {
       method: 'POST',
       url: '/message/send-user-id',
       data: body
     }),
-    sendUniqueId: (body: MessageUniqueIdPayload) => apiRequest<string>(options, {
+    sendUniqueId: (body: MessageUniqueIdPayload) => apiRequest<MessageUniqueIdResult>(options, {
       method: 'POST',
       url: '/message/send-unique-id',
-      data: body
-    }),
-    clearUserId: (body: MessageUserIdPayload) => apiRequest<string>(options, {
-      method: 'POST',
-      url: '/message/clear-user-id',
-      data: body
-    }),
-    clearUniqueId: (body: MessageUniqueIdPayload) => apiRequest<string>(options, {
-      method: 'POST',
-      url: '/message/clear-unique-id',
       data: body
     })
   }

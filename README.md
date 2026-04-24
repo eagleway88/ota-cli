@@ -6,6 +6,7 @@
 
 - 通过命令行调用 ota-api 的全部现有接口
 - 导出 `check`、`success`、`error`、`appError`、`captureAppError` 五个 SDK 方法，兼容 React Native、Electron Renderer、Electron Main
+- 导出基于 `socket.io-client` 的 WS SDK，支持按 `otaName/userId/uniqueId` 订阅与收发 ACK 事件
 - 支持 `ota-cli.config.ts` 配置文件
 - 支持受保护接口自动登录换取 token
 - 支持 ESM、CommonJS、TypeScript 类型声明
@@ -13,18 +14,19 @@
 ## 安装
 
 ```bash
-npm install @eagleway/ota-cli axios
+npm install @eagleway/ota-cli axios socket.io-client
 ```
 
 全局安装 CLI：
 
 ```bash
-npm install -g @eagleway/ota-cli axios
+npm install -g @eagleway/ota-cli axios socket.io-client
 ```
 
 说明：
 
 - `axios` 作为 peer dependency，由外部项目决定安装版本
+- `socket.io-client` 作为 peer dependency，由外部项目决定安装版本
 - CLI 命令名仍然是 `ota-cli`
 
 ## 配置文件
@@ -149,18 +151,6 @@ ota-cli message send-unique-id --unique-id device-1 --data '{"ver":101}'
 ota-cli message send-unique-id --unique-id device-1 --resend
 ```
 
-清除指定用户通知：
-
-```bash
-ota-cli message clear-user-id --user-id user-1
-```
-
-清除指定设备通知：
-
-```bash
-ota-cli message clear-unique-id --unique-id device-1
-```
-
 说明：
 
 - 新版 ota-api 使用 `message` 路由组
@@ -171,12 +161,12 @@ ota-cli message clear-unique-id --unique-id device-1
 
 ```bash
 ota-cli version check --name app-demo --ver 100 --platform ios --channel appstore
+```
 
 也可以带上架构过滤：
 
 ```bash
 ota-cli version check --name app-demo --ver 100 --platform ios --architecture arm64 --channel appstore
-```
 ```
 
 创建全量更新：
@@ -372,6 +362,59 @@ const version = await client.version.check({
   platform: 'android'
 })
 ```
+
+### WS 客户端
+
+```ts
+import { createWsClient } from '@eagleway/ota-cli'
+
+const ws = createWsClient({
+  baseURL: 'http://127.0.0.1:3001',
+  debug: true
+})
+
+ws.connect()
+
+const unsubscribeOta = ws.onOtaName('app-demo', payload => {
+  console.log('ota message:', payload)
+})
+
+await ws.subscribeOtaName({
+  otaName: 'app-demo',
+  platform: 'ios',
+  architecture: 'arm64',
+  channel: 'appstore',
+  ver: 100
+})
+
+const unsubscribeUser = ws.onUserId('app-demo_user-1', payload => {
+  console.log('user message envelope:', payload)
+  if (payload.ackRequired && payload.messageId) {
+    void ws.ackUserId({
+      userId: 'app-demo_user-1',
+      messageId: payload.messageId
+    })
+  }
+})
+
+await ws.subscribeUserId('app-demo_user-1')
+
+await ws.emitWithAck('ping', { ts: Date.now() })
+
+unsubscribeOta()
+unsubscribeUser()
+await ws.unsubscribeOtaName('app-demo')
+await ws.unsubscribeUserId('app-demo_user-1')
+ws.disconnect()
+```
+
+说明：
+
+- 默认会从 `baseURL` 推导 WS 地址为 `origin + /socket.io`
+- 默认只走 websocket 传输，并启用 socket.io 重连
+- `subscribeOtaName/subscribeUserId/subscribeUniqueId` 走 ACK 机制
+- `onUserId/onUniqueId` 会收到带 `messageId` 的消息信封；当 `ackRequired=true` 时可调用 `ackUserId/ackUniqueId`
+- 移动端和桌面端可共用同一套 API
 
 ## 发布
 

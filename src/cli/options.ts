@@ -34,14 +34,6 @@ export interface MessageSendUniqueIdCommandOptions extends GlobalCliOptions {
   resend?: boolean
 }
 
-export interface MessageClearUserIdCommandOptions extends GlobalCliOptions {
-  userId: string
-}
-
-export interface MessageClearUniqueIdCommandOptions extends GlobalCliOptions {
-  uniqueId: string
-}
-
 export interface VersionCheckCommandOptions extends GlobalCliOptions {
   name: string
   ver: string

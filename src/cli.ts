@@ -9,8 +9,6 @@ import { resolveAuthToken, stripCredentials } from './cli/auth'
 import { logError, logJson, logStep, logSuccess, logWarn } from './cli/logger'
 import type {
   AdminAuthCommandOptions,
-  MessageClearUniqueIdCommandOptions,
-  MessageClearUserIdCommandOptions,
   MessageSendGlobalCommandOptions,
   MessageSendOtaNameCommandOptions,
   MessageSendUniqueIdCommandOptions,
@@ -221,36 +219,6 @@ async function run() {
           })
         })
         logJson('message sent', result)
-      }))
-  )
-
-  withGlobalOptions(
-    message.command('clear-user-id')
-      .requiredOption('--user-id <userId>', 'user id')
-      .action(async (options: MessageClearUserIdCommandOptions) => withConfig(async config => {
-        const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
-        const result = await runLogged('clearing user message', async () => {
-          return client.message.clearUserId({
-            userId: options.userId
-          })
-        })
-        logJson('message cleared', result)
-      }))
-  )
-
-  withGlobalOptions(
-    message.command('clear-unique-id')
-      .requiredOption('--unique-id <uniqueId>', 'unique device id')
-      .action(async (options: MessageClearUniqueIdCommandOptions) => withConfig(async config => {
-        const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
-        const result = await runLogged('clearing device message', async () => {
-          return client.message.clearUniqueId({
-            uniqueId: options.uniqueId
-          })
-        })
-        logJson('message cleared', result)
       }))
   )
 

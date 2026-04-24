@@ -6,7 +6,7 @@ export default defineConfig([
       index: 'src/index.ts'
     },
     format: ['esm', 'cjs'],
-    external: ['axios'],
+    external: ['axios', 'socket.io-client'],
     dts: true,
     sourcemap: true,
     clean: true,
@@ -18,7 +18,7 @@ export default defineConfig([
       cli: 'src/cli.ts'
     },
     format: ['cjs'],
-    external: ['axios'],
+    external: ['axios', 'socket.io-client'],
     dts: false,
     sourcemap: true,
     clean: false,
