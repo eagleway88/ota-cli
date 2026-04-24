@@ -1,4 +1,3 @@
-import { io, type Socket } from 'socket.io-client'
 import type { VersionRecord } from './types'
 
 export type WsEventPayload = Record<string, unknown>
@@ -79,6 +78,31 @@ export interface WsClientOptions {
   debug?: boolean
 }
 
+export type WsSocketAckClient = {
+  emitWithAck: (event: string, payload?: WsEventPayload | string) => Promise<unknown>
+}
+
+export interface WsSocket {
+  id?: string
+  connected: boolean
+  on<THandler extends (...args: any[]) => void>(event: string, handler: THandler): void
+  off<THandler extends (...args: any[]) => void>(event: string, handler: THandler): void
+  emit(event: string, payload?: WsEventPayload | string): void
+  connect(): void
+  disconnect(): void
+  removeAllListeners(): void
+  timeout(timeout: number): WsSocketAckClient
+}
+
+export type WsAdapterOptions = {
+  path: string
+  transports: string[]
+  autoConnect: boolean
+  reconnection: boolean
+}
+
+export type WsAdapter = (url: string, options: WsAdapterOptions) => WsSocket
+
 type SocketEndpoint = {
   url: string
   path: string
@@ -96,11 +120,52 @@ type AckError = Error & {
 
 type WsLogLevel = 'info' | 'warn' | 'error'
 
+type SocketIoAdapterModule = {
+  io?: WsAdapter
+}
+
 const DEFAULT_TIMEOUT = 10000
 const DEFAULT_PATH = '/socket.io'
+const SOCKET_IO_CLIENT_MODULE = 'socket.io-client'
+
+let wsAdapter: WsAdapter | undefined
+
+export function configureWsAdapter(adapter: WsAdapter) {
+  wsAdapter = adapter
+}
+
+export function resetWsAdapter() {
+  wsAdapter = undefined
+}
+
+export function hasWsAdapter() {
+  return !!wsAdapter
+}
+
+async function importSocketIoAdapterModule() {
+  return import(SOCKET_IO_CLIENT_MODULE) as Promise<SocketIoAdapterModule>
+}
+
+export async function loadSocketIoAdapter(
+  loader: () => Promise<SocketIoAdapterModule> = importSocketIoAdapterModule
+) {
+  try {
+    const module = await loader()
+    if (typeof module.io !== 'function') {
+      throw new Error('socket.io-client does not export io')
+    }
+
+    configureWsAdapter(module.io)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    throw new Error(
+      `Failed to load socket.io-client adapter: ${message}. Install socket.io-client in the consumer project and call loadSocketIoAdapter() before using createWsClient().`
+    )
+  }
+}
 
 export class OtaWsClient {
-  private socket?: Socket
+  private socket?: WsSocket
 
   private currentUrl?: string
 
@@ -183,8 +248,18 @@ export class OtaWsClient {
     }
   }
 
+  private getWsAdapter() {
+    if (!wsAdapter) {
+      throw new Error(
+        'WebSocket adapter is not configured. Call loadSocketIoAdapter() or configureWsAdapter() before using createWsClient().'
+      )
+    }
+
+    return wsAdapter
+  }
+
   private createSocket(url: string, path: string, autoConnect: boolean) {
-    const socket = io(url, {
+    const socket = this.getWsAdapter()(url, {
       path,
       transports: ['websocket'],
       autoConnect,
@@ -265,7 +340,7 @@ export class OtaWsClient {
     return this.connect()
   }
 
-  onConnect(handler: (socket: Socket) => void): Unsubscribe {
+  onConnect(handler: (socket: WsSocket) => void): Unsubscribe {
     const socket = this.ensureSocket()
     const listener = () => handler(socket)
     socket.on('connect', listener)

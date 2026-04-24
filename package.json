@@ -1,6 +1,6 @@
 {
   "name": "@eagleway/ota-cli",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "CLI and SDK for ota-api",
   "license": "MIT",
   "type": "module",
@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./ws": {
+      "types": "./dist/ws.d.ts",
+      "import": "./dist/ws.js",
+      "require": "./dist/ws.cjs"
     }
   },
   "engines": {
@@ -37,8 +42,7 @@
     "prompts": "^2.4.2"
   },
   "peerDependencies": {
-    "axios": ">=1 <2",
-    "socket.io-client": "^4.8.0"
+    "axios": ">=1 <2"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
@@ -46,7 +50,6 @@
     "@types/prompts": "^2.4.9",
     "axios": "^1.13.6",
     "rimraf": "^6.0.1",
-    "socket.io-client": "^4.8.0",
     "tsup": "^8.4.0",
     "typescript": "^5.8.2"
   }

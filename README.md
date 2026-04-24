@@ -6,7 +6,7 @@
 
 - 通过命令行调用 ota-api 的全部现有接口
 - 导出 `check`、`success`、`error`、`appError`、`captureAppError` 五个 SDK 方法，兼容 React Native、Electron Renderer、Electron Main
-- 导出基于 `socket.io-client` 的 WS SDK，支持按 `otaName/userId/uniqueId` 订阅与收发 ACK 事件
+- 导出可注入适配器的 WS SDK，支持按 `otaName/userId/uniqueId` 订阅与收发 ACK 事件
 - 支持 `ota-cli.config.ts` 配置文件
 - 支持受保护接口自动登录换取 token
 - 支持 ESM、CommonJS、TypeScript 类型声明
@@ -14,19 +14,19 @@
 ## 安装
 
 ```bash
-npm install @eagleway/ota-cli axios socket.io-client
+npm install @eagleway/ota-cli axios
 ```
 
 全局安装 CLI：
 
 ```bash
-npm install -g @eagleway/ota-cli axios socket.io-client
+npm install -g @eagleway/ota-cli axios
 ```
 
 说明：
 
 - `axios` 作为 peer dependency，由外部项目决定安装版本
-- `socket.io-client` 作为 peer dependency，由外部项目决定安装版本
+- 仅在使用 WS 客户端时，才需要额外安装 `socket.io-client` 或注入自定义适配器
 - CLI 命令名仍然是 `ota-cli`
 
 ## 配置文件
@@ -365,8 +365,16 @@ const version = await client.version.check({
 
 ### WS 客户端
 
+包本身不再内置 `socket.io-client`。只有在使用 WS 客户端时，才需要在调用方项目里安装并显式加载适配器。
+
+```bash
+npm install socket.io-client
+```
+
 ```ts
-import { createWsClient } from '@eagleway/ota-cli'
+import { createWsClient, loadSocketIoAdapter } from '@eagleway/ota-cli/ws'
+
+await loadSocketIoAdapter()
 
 const ws = createWsClient({
   baseURL: 'http://127.0.0.1:3001',
@@ -415,6 +423,7 @@ ws.disconnect()
 - `subscribeOtaName/subscribeUserId/subscribeUniqueId` 走 ACK 机制
 - `onUserId/onUniqueId` 会收到带 `messageId` 的消息信封；当 `ackRequired=true` 时可调用 `ackUserId/ackUniqueId`
 - 移动端和桌面端可共用同一套 API
+- 如果你不用 socket.io-client，也可以通过 `configureWsAdapter()` 注入自定义实现
 
 ## 发布
 

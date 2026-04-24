@@ -3,10 +3,11 @@ import { defineConfig } from 'tsup'
 export default defineConfig([
   {
     entry: {
-      index: 'src/index.ts'
+      index: 'src/index.ts',
+      ws: 'src/ws.ts'
     },
     format: ['esm', 'cjs'],
-    external: ['axios', 'socket.io-client'],
+    external: ['axios'],
     dts: true,
     sourcemap: true,
     clean: true,
@@ -18,7 +19,7 @@ export default defineConfig([
       cli: 'src/cli.ts'
     },
     format: ['cjs'],
-    external: ['axios', 'socket.io-client'],
+    external: ['axios'],
     dts: false,
     sourcemap: true,
     clean: false,
