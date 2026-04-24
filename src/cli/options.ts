@@ -25,11 +25,13 @@ export interface MessageSendOtaNameCommandOptions extends GlobalCliOptions {
 export interface MessageSendUserIdCommandOptions extends GlobalCliOptions {
   userId: string
   data?: string
+  resend?: boolean
 }
 
 export interface MessageSendUniqueIdCommandOptions extends GlobalCliOptions {
   uniqueId: string
   data?: string
+  resend?: boolean
 }
 
 export interface MessageClearUserIdCommandOptions extends GlobalCliOptions {

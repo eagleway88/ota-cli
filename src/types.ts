@@ -55,11 +55,13 @@ export interface MessageOtaNamePayload {
 export interface MessageUserIdPayload {
   userId: string
   data?: unknown
+  resend?: boolean
 }
 
 export interface MessageUniqueIdPayload {
   uniqueId: string
   data?: unknown
+  resend?: boolean
 }
 
 export type PlatformType = 'ios' | 'android' | 'windows' | 'linux' | 'macos'

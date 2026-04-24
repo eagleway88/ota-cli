@@ -190,13 +190,15 @@ async function run() {
     message.command('send-user-id')
       .requiredOption('--user-id <userId>', 'user id')
       .option('--data <json>', 'notification payload as JSON string')
+      .option('--resend', 'resend the cached message')
       .action(async (options: MessageSendUserIdCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
         const client = createOtaClient(resolved)
         const result = await runLogged('sending user message', async () => {
           return client.message.sendUserId({
             userId: options.userId,
-            data: parseOptionalJsonData(options.data)
+            data: parseOptionalJsonData(options.data),
+            resend: options.resend
           })
         })
         logJson('message sent', result)
@@ -207,13 +209,15 @@ async function run() {
     message.command('send-unique-id')
       .requiredOption('--unique-id <uniqueId>', 'unique device id')
       .option('--data <json>', 'notification payload as JSON string')
+      .option('--resend', 'resend the cached message')
       .action(async (options: MessageSendUniqueIdCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
         const client = createOtaClient(resolved)
         const result = await runLogged('sending device message', async () => {
           return client.message.sendUniqueId({
             uniqueId: options.uniqueId,
-            data: parseOptionalJsonData(options.data)
+            data: parseOptionalJsonData(options.data),
+            resend: options.resend
           })
         })
         logJson('message sent', result)

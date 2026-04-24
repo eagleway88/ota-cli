@@ -131,10 +131,22 @@ ota-cli message send-ota-name --ota-name app-demo --data '{"ver":101}'
 ota-cli message send-user-id --user-id user-1 --data '{"ver":101}'
 ```
 
+需要重发缓存消息时可加 `--resend`：
+
+```bash
+ota-cli message send-user-id --user-id user-1 --resend
+```
+
 发送指定设备通知：
 
 ```bash
 ota-cli message send-unique-id --unique-id device-1 --data '{"ver":101}'
+```
+
+需要重发缓存消息时可加 `--resend`：
+
+```bash
+ota-cli message send-unique-id --unique-id device-1 --resend
 ```
 
 清除指定用户通知：

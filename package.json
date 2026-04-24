@@ -1,6 +1,6 @@
 {
   "name": "@eagleway/ota-cli",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "CLI and SDK for ota-api",
   "license": "MIT",
   "type": "module",
