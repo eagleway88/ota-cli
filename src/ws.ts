@@ -44,29 +44,35 @@ export type UniqueIdAckPayload = {
   messageId: string
 }
 
-export type UserIdAckResponse = {
-  event: 'userId:acked' | 'userId:error'
-  data:
-  | {
-    uid: string
-    messageId: string
-    acked: boolean
-    clientId: string
-  }
-  | string
+export type AckErrorResponse = {
+  error: string
 }
 
+export type UserIdSubscriptionAckResponse = {
+  uid: string
+} | AckErrorResponse
+
+export type UniqueIdSubscriptionAckResponse = {
+  uniqueId: string
+} | AckErrorResponse
+
+export type OtaNameSubscriptionAckResponse = {
+  ota: string
+} | AckErrorResponse
+
+export type UserIdAckResponse = {
+  uid: string
+  messageId: string
+  acked: boolean
+  clientId: string
+} | AckErrorResponse
+
 export type UniqueIdAckResponse = {
-  event: 'uniqueId:acked' | 'uniqueId:error'
-  data:
-  | {
-    uniqueId: string
-    messageId: string
-    acked: boolean
-    clientId: string
-  }
-  | string
-}
+  uniqueId: string
+  messageId: string
+  acked: boolean
+  clientId: string
+} | AckErrorResponse
 
 export type Unsubscribe = () => void
 
@@ -364,6 +370,15 @@ export class OtaWsClient {
     payload?: WsEventPayload | string,
     timeout = this.defaultTimeout
   ) {
+    return this.emitWithAckInternal<TResponse>(event, payload, timeout)
+  }
+
+  private async emitWithAckInternal<TResponse = unknown>(
+    event: string,
+    payload?: WsEventPayload | string,
+    timeout = this.defaultTimeout,
+    suppressTimeoutLog = false
+  ) {
     const socket = this.ensureSocket()
     this.log('info', `emitWithAck:${event}`, { payload, timeout })
 
@@ -372,8 +387,11 @@ export class OtaWsClient {
       this.log('info', `ack:${event}`, response)
       return response
     } catch (error) {
-      const level: WsLogLevel = this.isAckTimeoutError(error) ? 'warn' : 'error'
-      this.log(level, `ack_error:${event}`, error)
+      const isTimeoutError = this.isAckTimeoutError(error)
+      if (!(suppressTimeoutLog && isTimeoutError)) {
+        const level: WsLogLevel = isTimeoutError ? 'warn' : 'error'
+        this.log(level, `ack_error:${event}`, error)
+      }
       throw error
     }
   }
@@ -389,7 +407,12 @@ export class OtaWsClient {
     timeout = this.defaultTimeout
   ) {
     try {
-      return await this.emitWithAck<TResponse>(event, payload, timeout)
+      return await this.emitWithAckInternal<TResponse>(
+        event,
+        payload,
+        timeout,
+        true
+      )
     } catch {
       return undefined
     }
@@ -406,12 +429,18 @@ export class OtaWsClient {
 
   subscribeUserId(userId: string) {
     const payload: UserIdSubscriptionPayload = { userId }
-    return this.emitWithAck('userId:subscribe', payload)
+    return this.emitWithAck<UserIdSubscriptionAckResponse>(
+      'userId:subscribe',
+      payload
+    )
   }
 
   unsubscribeUserId(userId: string) {
     const payload: UserIdSubscriptionPayload = { userId }
-    return this.safeEmitWithAck('userId:unsubscribe', payload)
+    return this.safeEmitWithAck<UserIdSubscriptionAckResponse>(
+      'userId:unsubscribe',
+      payload
+    )
   }
 
   ackUserId(payload: UserIdAckPayload) {
@@ -425,11 +454,17 @@ export class OtaWsClient {
   }
 
   subscribeOtaName(payload: OtaNameSubscriptionPayload) {
-    return this.emitWithAck('otaName:subscribe', payload)
+    return this.emitWithAck<OtaNameSubscriptionAckResponse>(
+      'otaName:subscribe',
+      payload
+    )
   }
 
   unsubscribeOtaName(otaName: string) {
-    return this.safeEmitWithAck('otaName:unsubscribe', { otaName })
+    return this.safeEmitWithAck<OtaNameSubscriptionAckResponse>(
+      'otaName:unsubscribe',
+      { otaName }
+    )
   }
 
   onUniqueId<T = unknown>(
@@ -443,11 +478,17 @@ export class OtaWsClient {
 
   subscribeUniqueId(uniqueId: string) {
     const payload: UniqueIdSubscriptionPayload = { uniqueId }
-    return this.emitWithAck('uniqueId:subscribe', payload)
+    return this.emitWithAck<UniqueIdSubscriptionAckResponse>(
+      'uniqueId:subscribe',
+      payload
+    )
   }
 
   unsubscribeUniqueId(uniqueId: string) {
-    return this.safeEmitWithAck('uniqueId:unsubscribe', { uniqueId })
+    return this.safeEmitWithAck<UniqueIdSubscriptionAckResponse>(
+      'uniqueId:unsubscribe',
+      { uniqueId }
+    )
   }
 
   ackUniqueId(payload: UniqueIdAckPayload) {
