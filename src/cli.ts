@@ -257,6 +257,7 @@ async function run() {
       .option('--file-size <size>', 'file size')
       .option('--enable <enable>', '1 or 0')
       .option('--mandatory <mandatory>', '1 or 0')
+      .option('--show-dialog <showDialog>', '1 or 0')
       .option('--install-url <url>', 'full update install url')
       .option('--package-url <url>', 'hot update package url')
       .option('--channel <channel>', 'channel name')
@@ -290,6 +291,7 @@ async function run() {
       .option('--desc <desc>', 'update description')
       .option('--enable <enable>', '1 or 0')
       .option('--mandatory <mandatory>', '1 or 0')
+      .option('--show-dialog <showDialog>', '1 or 0')
       .option('--install-url <url>', 'optional install url')
       .option('--channel <channel>', 'channel name')
       .action(async (options: VersionUploadCommandOptions) => withConfig(async config => {

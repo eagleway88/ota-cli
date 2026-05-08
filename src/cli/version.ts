@@ -21,6 +21,7 @@ export function buildCreatePayload(options: VersionCreateCommandOptions, config:
     fileSize: toOptionalNumber(options.fileSize) ?? config.fileSize,
     enable: toOptionalNumber(options.enable) ?? config.enable,
     mandatory: toOptionalNumber(options.mandatory) ?? config.mandatory,
+    showDialog: toOptionalNumber(options.showDialog) ?? config.showDialog,
     installUrl: options.installUrl ?? config.installUrl,
     packageUrl: options.packageUrl ?? config.packageUrl,
     channel: options.channel ?? config.channel

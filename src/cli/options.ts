@@ -51,6 +51,7 @@ export interface VersionCreateCommandOptions extends GlobalCliOptions {
   fileSize?: string
   enable?: string
   mandatory?: string
+  showDialog?: string
   installUrl?: string
   packageUrl?: string
   channel?: string
@@ -65,6 +66,7 @@ export interface VersionUploadCommandOptions extends GlobalCliOptions {
   desc?: string
   enable?: string
   mandatory?: string
+  showDialog?: string
   installUrl?: string
   channel?: string
 }

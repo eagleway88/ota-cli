@@ -45,6 +45,7 @@ const config: OtaCliConfig = {
   architecture: 'arm64,x64',
   desc: '1.0.1 update',
   mandatory: 1,
+  showDialog: 1,
   iosPath: './dist/ios/main.bundle',
   androidPath: './dist/android/index.bundle',
   auth: {
@@ -180,6 +181,7 @@ ota-cli version create \
   --desc "1.0.1 full update" \
   --install-url https://cdn.example.com/app-demo-1.0.1.apk \
   --mandatory 1 \
+  --show-dialog 1 \
   --auth-username admin \
   --auth-password 123456
 ```
@@ -193,6 +195,7 @@ ota-cli version upload \
   --platform ios,android \
   --architecture arm64,x64 \
   --desc "1.0.1 hot update" \
+  --show-dialog 1 \
   --auth-username admin \
   --auth-password 123456
 ```

@@ -94,6 +94,7 @@ export interface VersionRecord {
   fileSize?: number
   enable?: number
   mandatory?: number
+  showDialog?: number
   installUrl?: string
   packageUrl?: string
   channel?: string
