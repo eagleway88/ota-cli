@@ -90,6 +90,7 @@ export interface VersionRecord {
   name: string
   platform: string
   architecture?: string
+  baseVersions?: string
   desc?: string
   fileSize?: number
   enable?: number

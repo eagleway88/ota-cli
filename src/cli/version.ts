@@ -1,4 +1,4 @@
-import type { CreatePayload, OtaCliConfig, PlatformType, VersionRecord } from '../types'
+import type { CreatePayload, OtaCliConfig, PlatformType, UploadPayload, VersionRecord } from '../types'
 import type { VersionCreateCommandOptions, VersionUploadCommandOptions } from './options'
 import { logStep, logWarn } from './logger'
 import { toOptionalNumber } from './utils'
@@ -17,6 +17,7 @@ export function buildCreatePayload(options: VersionCreateCommandOptions, config:
     ver: Number(options.ver || config.ver),
     platform: options.platform || config.platform || '',
     architecture: options.architecture ?? config.architecture,
+    baseVersions: options.baseVersions ?? config.baseVersions,
     desc: options.desc ?? config.desc,
     fileSize: toOptionalNumber(options.fileSize) ?? config.fileSize,
     enable: toOptionalNumber(options.enable) ?? config.enable,
@@ -43,12 +44,25 @@ export function buildCreatePayload(options: VersionCreateCommandOptions, config:
 export function resolveUploadTarget(
   options: VersionUploadCommandOptions,
   config: OtaCliConfig
-): { filePath: string; payload: CreatePayload } {
+): { filePath: string; payload: UploadPayload } {
   const runtimePlatform = detectRuntimePlatform()
-  const payload = buildCreatePayload(options, {
+  const createPayload = buildCreatePayload(options, {
     ...config,
     platform: options.platform || config.platform || runtimePlatform
   })
+  const payload: UploadPayload = {
+    name: createPayload.name,
+    ver: createPayload.ver,
+    platform: createPayload.platform,
+    architecture: createPayload.architecture,
+    baseVersions: createPayload.baseVersions,
+    desc: createPayload.desc,
+    enable: createPayload.enable,
+    mandatory: createPayload.mandatory,
+    showDialog: createPayload.showDialog,
+    installUrl: createPayload.installUrl,
+    channel: createPayload.channel
+  }
   const filePath = resolveUploadFilePath(options.file, payload.platform, config)
   return { filePath, payload }
 }

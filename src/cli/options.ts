@@ -47,6 +47,7 @@ export interface VersionCreateCommandOptions extends GlobalCliOptions {
   ver?: string
   platform?: string
   architecture?: string
+  baseVersions?: string
   desc?: string
   fileSize?: string
   enable?: string
@@ -63,6 +64,7 @@ export interface VersionUploadCommandOptions extends GlobalCliOptions {
   ver?: string
   platform?: string
   architecture?: string
+  baseVersions?: string
   desc?: string
   enable?: string
   mandatory?: string

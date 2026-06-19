@@ -43,6 +43,7 @@ const config: OtaCliConfig = {
   ver: 101,
   platform: 'ios,android',
   architecture: 'arm64,x64',
+  baseVersions: '100,101',
   desc: '1.0.1 update',
   mandatory: 1,
   showDialog: 1,
@@ -74,6 +75,7 @@ export default config
 - 如果接口返回 `401` 或 `403`，CLI 会自动清除本机缓存 token，并重新登录后重试一次受保护请求
 - `OtaCliConfig` 支持 `CreatePayload` 的所有可选字段，`create` 和 `upload` 会优先使用命令行参数，其次回退到配置文件
 - `architecture` 支持逗号分隔多架构，例如 `arm64,x64`
+- `baseVersions` 表示适用基础版本，支持逗号分隔多版本，例如 `100,101`
 - `iosPath`、`androidPath`、`windowsPath`、`linuxPath`、`macosPath` 用于 `upload` 自动选择上传文件
 - `upload` 优先按 `--platform` 拆分后的平台顺序匹配对应 `*Path`，如果没有传 `--platform`，则按当前命令行运行环境匹配
 - `upload` 只接受 `.zip` 文件或目录：
@@ -178,6 +180,7 @@ ota-cli version create \
   --ver 101 \
   --platform ios,android \
   --architecture arm64,x64 \
+  --base-versions 100,101 \
   --desc "1.0.1 full update" \
   --install-url https://cdn.example.com/app-demo-1.0.1.apk \
   --mandatory 1 \
@@ -194,6 +197,7 @@ ota-cli version upload \
   --ver 101 \
   --platform ios,android \
   --architecture arm64,x64 \
+  --base-versions 100,101 \
   --desc "1.0.1 hot update" \
   --show-dialog 1 \
   --auth-username admin \
@@ -201,6 +205,8 @@ ota-cli version upload \
 ```
 
 如果没有传 `--file`，CLI 会尝试从 `ota-cli.config.ts` 的 `iosPath`、`androidPath` 等字段自动解析上传文件。
+
+`--base-versions` / `baseVersions` 字段描述：适用基础版本(多版本用逗号拼接 `100,101`)。
 
 上传文件规则：
 
