@@ -118,6 +118,12 @@ ota-cli admin login --base-url http://127.0.0.1:3001 --username admin --password
 
 ### 消息接口
 
+查询所有 userId 订阅，可通过 OTA 名称过滤：
+
+```bash
+ota-cli message list-user-id-subscriptions --name app-demo
+```
+
 发送全局通知：
 
 ```bash
@@ -157,8 +163,21 @@ ota-cli message send-unique-id --unique-id device-1 --resend
 说明：
 
 - 新版 ota-api 使用 `message` 路由组
+- 所有消息接口均为受保护接口，CLI 会自动获取并携带 token
 
 ### 版本接口
+
+分页查询版本数据：
+
+```bash
+ota-cli version list \
+  --name app-demo \
+  --page 1 \
+  --page-size 20 \
+  --platform ios \
+  --update-type full \
+  --enable 1
+```
 
 检查更新：
 
@@ -358,8 +377,20 @@ const token = await client.admin.login({
   password: '123456'
 })
 
-await client.message.sendGlobal({
-  type: 'ota-update',
+const authenticatedClient = createOtaClient({
+  baseURL: 'http://127.0.0.1:3001',
+  token
+})
+
+const subscribedUserIds = await authenticatedClient.message.listSubscribedUserIds('app-demo')
+
+const versions = await authenticatedClient.version.list('app-demo', {
+  page: 1,
+  pageSize: 20,
+  platform: 'android'
+})
+
+await authenticatedClient.message.sendGlobal({
   data: {
     ver: 101
   }

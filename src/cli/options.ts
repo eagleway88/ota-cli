@@ -16,6 +16,10 @@ export interface MessageSendGlobalCommandOptions extends GlobalCliOptions {
   data?: string
 }
 
+export interface MessageListUserIdSubscriptionsCommandOptions extends GlobalCliOptions {
+  name?: string
+}
+
 export interface MessageSendOtaNameCommandOptions extends GlobalCliOptions {
   otaName: string
   data?: string
@@ -40,6 +44,21 @@ export interface VersionCheckCommandOptions extends GlobalCliOptions {
   architecture?: string
   channel?: string
   id?: string
+}
+
+export interface VersionListCommandOptions extends GlobalCliOptions {
+  name: string
+  page?: string
+  pageSize?: string
+  id?: string
+  ver?: string
+  platform?: string
+  architecture?: string
+  channel?: string
+  updateType?: string
+  enable?: '0' | '1'
+  mandatory?: '0' | '1'
+  showDialog?: '0' | '1'
 }
 
 export interface VersionCreateCommandOptions extends GlobalCliOptions {

@@ -104,6 +104,30 @@ export interface VersionRecord {
   createTime?: string
 }
 
+export interface VersionListItem extends VersionRecord {
+  successCount: number
+  errorCount: number
+}
+
+export interface VersionListQuery {
+  page?: number
+  pageSize?: number
+  id?: string
+  ver?: string
+  platform?: string
+  architecture?: string
+  channel?: string
+  updateType?: UpdateType
+  enable?: '0' | '1'
+  mandatory?: '0' | '1'
+  showDialog?: '0' | '1'
+}
+
+export interface PageResult<T> {
+  data: T[]
+  total: number
+}
+
 export interface CheckPayload {
   id?: number
   ver: number

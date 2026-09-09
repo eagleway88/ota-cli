@@ -2,18 +2,26 @@ import { Command } from 'commander'
 import { appError, createOtaClient, check, error, success } from './client'
 import { OtaApiError } from './http'
 import { APP_ERROR_KINDS } from './types'
-import type { AppErrorKind, AppErrorPayload, ErrorPayload, OtaCliConfig } from './types'
+import type {
+  AppErrorKind,
+  AppErrorPayload,
+  ErrorPayload,
+  OtaCliConfig,
+  UpdateType
+} from './types'
 import { clearCachedSession, writeCachedSession } from './cli/cache'
 import { loadCliConfig } from './cli/config'
 import { resolveAuthToken, stripCredentials } from './cli/auth'
 import { logError, logJson, logStep, logSuccess, logWarn } from './cli/logger'
 import type {
   AdminAuthCommandOptions,
+  MessageListUserIdSubscriptionsCommandOptions,
   MessageSendGlobalCommandOptions,
   MessageSendOtaNameCommandOptions,
   MessageSendUniqueIdCommandOptions,
   MessageSendUserIdCommandOptions,
   VersionCheckCommandOptions,
+  VersionListCommandOptions,
   VersionCreateCommandOptions,
   VersionAppErrorCommandOptions,
   VersionErrorCommandOptions,
@@ -150,14 +158,31 @@ async function run() {
 
   const message = program.command('message').description('message APIs')
   withGlobalOptions(
+    message.command('list-user-id-subscriptions')
+      .option('--name <name>', 'filter subscriptions by OTA name')
+      .action(async (options: MessageListUserIdSubscriptionsCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const result = await runLogged('listing user id subscriptions', async () => {
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.message.listSubscribedUserIds(options.name)
+          })
+        })
+        logJson('user id subscriptions', result)
+      }))
+  )
+
+  withGlobalOptions(
     message.command('send-global')
       .option('--data <json>', 'notification payload as JSON string')
       .action(async (options: MessageSendGlobalCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
         const result = await runLogged('sending global message', async () => {
-          return client.message.sendGlobal({
-            data: parseOptionalJsonData(options.data)
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.message.sendGlobal({
+              data: parseOptionalJsonData(options.data)
+            })
           })
         })
         logJson('message sent', result)
@@ -170,11 +195,13 @@ async function run() {
       .option('--data <json>', 'notification payload as JSON string')
       .action(async (options: MessageSendOtaNameCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
         const result = await runLogged('sending ota message', async () => {
-          return client.message.sendOtaName({
-            otaName: options.otaName,
-            data: parseOptionalJsonData(options.data)
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.message.sendOtaName({
+              otaName: options.otaName,
+              data: parseOptionalJsonData(options.data)
+            })
           })
         })
         logJson('message sent', result)
@@ -188,12 +215,14 @@ async function run() {
       .option('--resend', 'resend the cached message')
       .action(async (options: MessageSendUserIdCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
         const result = await runLogged('sending user message', async () => {
-          return client.message.sendUserId({
-            userId: options.userId,
-            data: parseOptionalJsonData(options.data),
-            resend: options.resend
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.message.sendUserId({
+              userId: options.userId,
+              data: parseOptionalJsonData(options.data),
+              resend: options.resend
+            })
           })
         })
         logJson('message sent', result)
@@ -207,12 +236,14 @@ async function run() {
       .option('--resend', 'resend the cached message')
       .action(async (options: MessageSendUniqueIdCommandOptions) => withConfig(async config => {
         const resolved = resolveCliOptions(options, config)
-        const client = createOtaClient(resolved)
         const result = await runLogged('sending device message', async () => {
-          return client.message.sendUniqueId({
-            uniqueId: options.uniqueId,
-            data: parseOptionalJsonData(options.data),
-            resend: options.resend
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.message.sendUniqueId({
+              uniqueId: options.uniqueId,
+              data: parseOptionalJsonData(options.data),
+              resend: options.resend
+            })
           })
         })
         logJson('message sent', result)
@@ -220,6 +251,44 @@ async function run() {
   )
 
   const version = program.command('version').description('version APIs')
+  withGlobalOptions(
+    version.command('list')
+      .requiredOption('--name <name>', 'app name')
+      .option('--page <page>', 'page number')
+      .option('--page-size <pageSize>', 'items per page')
+      .option('--id <id>', 'version table id')
+      .option('--ver <ver>', 'version number, e.g. 100 or 1.0.0')
+      .option('--platform <platform>', 'target platform')
+      .option('--architecture <architecture>', 'target architecture')
+      .option('--channel <channel>', 'channel name')
+      .option('--update-type <updateType>', 'update type: full or hot')
+      .option('--enable <enable>', '1 or 0')
+      .option('--mandatory <mandatory>', '1 or 0')
+      .option('--show-dialog <showDialog>', '1 or 0')
+      .action(async (options: VersionListCommandOptions) => withConfig(async config => {
+        const resolved = resolveCliOptions(options, config)
+        const result = await runLogged('listing version records', async () => {
+          return withProtectedAuth(resolved, async token => {
+            const client = createOtaClient({ ...stripCredentials(resolved), token })
+            return client.version.list(options.name, {
+              page: toOptionalNumber(options.page),
+              pageSize: toOptionalNumber(options.pageSize),
+              id: options.id,
+              ver: options.ver,
+              platform: options.platform,
+              architecture: options.architecture,
+              channel: options.channel,
+              updateType: options.updateType as UpdateType | undefined,
+              enable: options.enable,
+              mandatory: options.mandatory,
+              showDialog: options.showDialog
+            })
+          })
+        })
+        logJson('version records', result)
+      }))
+  )
+
   withGlobalOptions(
     version.command('check')
       .requiredOption('--name <name>', 'app name')

@@ -18,6 +18,7 @@ export type {
   MessageUserIdResult,
   MessageUserIdPayload,
   OtaCliConfig,
+  PageResult,
   PlatformType,
   RequestOptions,
   StatusPayload,
@@ -25,5 +26,7 @@ export type {
   TargetedMessageResult,
   UpdateType,
   UploadPayload,
+  VersionListItem,
+  VersionListQuery,
   VersionRecord
 } from './types'

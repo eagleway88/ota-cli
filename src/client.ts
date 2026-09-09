@@ -12,14 +12,22 @@ import type {
   MessageUniqueIdPayload,
   MessageUserIdResult,
   MessageUserIdPayload,
+  PageResult,
   RequestOptions,
   SuccessPayload,
   UploadPayload,
+  VersionListItem,
+  VersionListQuery,
   VersionRecord
 } from './types'
 
 export function createOtaClient(options: RequestOptions) {
   const message = {
+    listSubscribedUserIds: (name?: string) => apiRequest<string[]>(options, {
+      method: 'GET',
+      url: '/message/user-id-subscriptions',
+      params: name === undefined ? undefined : { name }
+    }),
     sendGlobal: (body: MessageGlobalPayload) => apiRequest<string>(options, {
       method: 'POST',
       url: '/message/send-global',
@@ -57,6 +65,11 @@ export function createOtaClient(options: RequestOptions) {
     },
     message,
     version: {
+      list: (name: string, body: VersionListQuery = {}) => apiRequest<PageResult<VersionListItem>>(options, {
+        method: 'POST',
+        url: `/version/list/${encodeURIComponent(name)}`,
+        data: body
+      }),
       check: (body: CheckPayload) => apiRequest<VersionRecord | null>(options, {
         method: 'POST',
         url: '/version/check',
