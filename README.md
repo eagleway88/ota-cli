@@ -403,6 +403,35 @@ const version = await client.version.check({
 })
 ```
 
+### Node.js 热更新上传
+
+服务端或其它 Node.js 环境可以通过 Node 专用入口上传 ZIP 文件或目录。目录会先压缩为临时 ZIP，上传完成后自动清理。
+
+```ts
+import { uploadVersion } from '@eagleway/ota-cli/node'
+
+const version = await uploadVersion(
+  {
+    baseURL: 'http://127.0.0.1:3001/api',
+    token: 'your-token'
+  },
+  './dist/windows.zip',
+  {
+    name: 'app-demo',
+    ver: 101,
+    platform: 'windows',
+    architecture: 'x64',
+    baseVersions: '100',
+    desc: '1.0.1 hot update',
+    enable: 1,
+    mandatory: 0,
+    showDialog: 1
+  }
+)
+```
+
+该入口依赖 Node.js 文件系统，不应在 React Native 或 Electron Renderer 中导入。
+
 ### WS 客户端
 
 包本身不再内置 `socket.io-client`。只有在使用 WS 客户端时，才需要在调用方项目里安装并显式加载适配器。

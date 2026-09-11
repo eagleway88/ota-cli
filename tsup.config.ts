@@ -4,7 +4,8 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
-      ws: 'src/ws.ts'
+      ws: 'src/ws.ts',
+      node: 'src/node.ts'
     },
     format: ['esm', 'cjs'],
     external: ['axios'],

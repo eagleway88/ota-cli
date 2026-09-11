@@ -1,6 +1,6 @@
 {
   "name": "@eagleway/ota-cli",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "CLI and SDK for ota-api",
   "license": "MIT",
   "type": "module",
@@ -24,6 +24,11 @@
       "types": "./dist/ws.d.ts",
       "import": "./dist/ws.js",
       "require": "./dist/ws.cjs"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
     }
   },
   "engines": {

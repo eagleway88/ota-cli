@@ -6,14 +6,14 @@ import { randomUUID } from 'node:crypto'
 import archiver from 'archiver'
 import FormData from 'form-data'
 import { createHttpClient, normalizeApiError, unwrapEnvelope } from '../http'
-import type { RequestOptions, VersionRecord } from '../types'
+import type { RequestOptions, UploadPayload, VersionRecord } from '../types'
 import { logStep } from './logger'
 
 export async function uploadVersion(
   options: RequestOptions,
   filePath: string,
-  body: Record<string, unknown>
-) {
+  body: UploadPayload
+): Promise<VersionRecord> {
   const prepared = await prepareUploadSource(filePath)
   const fileSize = fs.statSync(prepared.filePath).size
   logStep(`upload zip size: ${formatFileSize(fileSize)}`)
