@@ -26,7 +26,8 @@ export async function prepareSource(input: string): Promise<PreparedSource> {
         for (const name of names.sort()) {
           const next = path.join(relative, name)
           const entry = await lstat(path.join(resolved, next))
-          if (entry.isSymbolicLink()) throw new Error('Symbolic links are not allowed in upload directories')
+          if (entry.isSymbolicLink())
+            throw new Error('Symbolic links are not allowed in upload directories')
           if (entry.isDirectory()) await walk(next)
           else if (entry.isFile()) entries.push(next)
           else throw new Error('Unsupported upload directory entry')
@@ -36,18 +37,39 @@ export async function prepareSource(input: string): Promise<PreparedSource> {
       await new Promise<void>((resolve, reject) => {
         const output = createWriteStream(filePath, { flags: 'wx', mode: 0o600 })
         const archive = archiver('zip', { zlib: { level: 9 } })
-        const failed = (error: Error) => { archive.abort(); output.destroy(); reject(error) }
-        output.on('close', resolve); output.on('error', failed)
-        archive.on('error', failed); archive.on('warning', failed)
+        const failed = (error: Error) => {
+          archive.abort()
+          output.destroy()
+          reject(error)
+        }
+        output.on('close', resolve)
+        output.on('error', failed)
+        archive.on('error', failed)
+        archive.on('warning', failed)
         archive.pipe(output)
-        for (const relative of entries) archive.file(path.join(resolved, relative), { name: relative.split(path.sep).join('/'), date: new Date('1980-01-01T00:00:00Z') })
+        for (const relative of entries)
+          archive.file(path.join(resolved, relative), {
+            name: relative.split(path.sep).join('/'),
+            date: new Date('1980-01-01T00:00:00Z')
+          })
         void archive.finalize().catch(failed)
       })
-    } else if (!info.isFile() || path.extname(resolved).toLowerCase() !== '.zip') throw new Error('Upload source must be a ZIP file or a directory')
+    } else if (!info.isFile() || path.extname(resolved).toLowerCase() !== '.zip')
+      throw new Error('Upload source must be a ZIP file or a directory')
     const hash = createHash('sha256')
     let sizeBytes = 0
-    for await (const chunk of createReadStream(filePath)) { hash.update(chunk as Buffer); sizeBytes += (chunk as Buffer).length }
-    return { filePath, checksumSha256: hash.digest('hex'), sizeBytes, cleanup: async () => { if (directory) await rm(directory, { recursive: true, force: true }) } }
+    for await (const chunk of createReadStream(filePath)) {
+      hash.update(chunk as Buffer)
+      sizeBytes += (chunk as Buffer).length
+    }
+    return {
+      filePath,
+      checksumSha256: hash.digest('hex'),
+      sizeBytes,
+      cleanup: async () => {
+        if (directory) await rm(directory, { recursive: true, force: true })
+      }
+    }
   } catch (error) {
     if (directory) await rm(directory, { recursive: true, force: true })
     throw error

@@ -16,42 +16,63 @@
   ],
   "exports": {
     "./manage": {
-      "types": "./dist/manage.d.ts",
-      "import": "./dist/manage.js",
-      "require": "./dist/manage.cjs"
+      "import": {
+        "types": "./dist/manage.d.ts",
+        "default": "./dist/manage.js"
+      },
+      "require": {
+        "types": "./dist/manage.d.cts",
+        "default": "./dist/manage.cjs"
+      }
     },
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./ws": {
-      "types": "./dist/ws.d.ts",
-      "import": "./dist/ws.js",
-      "require": "./dist/ws.cjs"
+      "import": {
+        "types": "./dist/ws.d.ts",
+        "default": "./dist/ws.js"
+      },
+      "require": {
+        "types": "./dist/ws.d.cts",
+        "default": "./dist/ws.cjs"
+      }
     },
     "./node": {
-      "types": "./dist/node.d.ts",
-      "import": "./dist/node.js",
-      "require": "./dist/node.cjs"
+      "import": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      },
+      "require": {
+        "types": "./dist/node.d.cts",
+        "default": "./dist/node.cjs"
+      }
     }
   },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "build": "rimraf dist && tsup",
+    "build": "rimraf dist && tsup && node test/verify-package.cjs",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "test": "node test/run.cjs",
-    "test:verify": "pnpm typecheck && pnpm build && pnpm test"
+    "test:verify": "pnpm typecheck && pnpm lint && pnpm build && pnpm test",
+    "lint": "prettier --check \"src/**/*.ts\" \"test/**/*.cjs\" \"test/**/*.mts\" \"test/**/*.cts\" tsup.config.ts ota-cli.config.ts package.json",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.cjs\" \"test/**/*.mts\" \"test/**/*.cts\" tsup.config.ts ota-cli.config.ts package.json"
   },
   "dependencies": {
     "archiver": "^7.0.1",
     "commander": "^12.1.0",
     "form-data": "^4.0.2",
-    "jiti": "^2.4.2",
-    "picocolors": "^1.1.1"
+    "jiti": "^2.4.2"
   },
   "peerDependencies": {
     "axios": ">=1 <2"
@@ -60,6 +81,7 @@
     "@types/archiver": "^7.0.0",
     "@types/node": "^22.14.1",
     "axios": "^1.13.6",
+    "prettier": "3.4.2",
     "rimraf": "^6.0.1",
     "tsup": "^8.4.0",
     "typescript": "^5.8.2"

@@ -5,11 +5,34 @@ const { createManageClient } = require('../../dist/manage.cjs')
 const key = 'ota_ak_12345678-1234-4123-8123-123456789abc.' + 's'.repeat(43)
 test('public reports preserve JSON and reportId without body appName or key', async () => {
   const calls = []
-  const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a', adapter: async config => { calls.push(config); return { config, data: { code: 0, data: { id: 1 } }, status: 200, statusText: 'OK', headers: {} } } })
-  const payload = { platform: 'windows', versionCode: 110, releaseSequence: 1, reportId: '12345678-1234-4123-8123-123456789abc', extras: { num: 1, flag: false, nested: [null, 'x'] } }
+  const app = createAppClient({
+    baseURL: 'https://example.test/api/v1',
+    appName: 'app-a',
+    adapter: async (config) => {
+      calls.push(config)
+      return {
+        config,
+        data: { code: 0, data: { id: 1 } },
+        status: 200,
+        statusText: 'OK',
+        headers: {}
+      }
+    }
+  })
+  const payload = {
+    platform: 'windows',
+    versionCode: 110,
+    releaseSequence: 1,
+    reportId: '12345678-1234-4123-8123-123456789abc',
+    extras: { num: 1, flag: false, nested: [null, 'x'] }
+  }
   await app.reportSuccess(payload)
   await app.reportFailure({ ...payload, message: 'failed' })
-  await app.captureAppError(new Error('crash'), { platform: 'windows', versionCode: 110, extras: false })
+  await app.captureAppError(new Error('crash'), {
+    platform: 'windows',
+    versionCode: 110,
+    extras: false
+  })
   assert.deepEqual(JSON.parse(calls[0].data), payload)
   assert.equal(calls[0].url, 'app/apps/app-a/telemetry/successes')
   assert.equal(calls[1].url, 'app/apps/app-a/telemetry/failures')
@@ -18,8 +41,30 @@ test('public reports preserve JSON and reportId without body appName or key', as
 })
 test('a shared desktop ZIP needs one draft covering three platforms', async () => {
   let captured
-  const app = createManageClient({ baseURL: 'https://example.test/api/v1', accessKey: key, adapter: async config => { captured = config; return { config, status: 201, statusText: 'OK', headers: {}, data: { code: 0, data: { releaseId: 'r', status: 'draft' } } } } }).forApp('desktop')
-  const input = { targetVersionCode: 110, baseVersionCodes: [100], platforms: ['windows', 'macos', 'linux'], updateType: 'hot', releaseScope: 'public', userIds: [], artifactId: 'artifact-1', mandatory: false }
+  const app = createManageClient({
+    baseURL: 'https://example.test/api/v1',
+    accessKey: key,
+    adapter: async (config) => {
+      captured = config
+      return {
+        config,
+        status: 201,
+        statusText: 'OK',
+        headers: {},
+        data: { code: 0, data: { releaseId: 'r', status: 'draft' } }
+      }
+    }
+  }).forApp('desktop')
+  const input = {
+    targetVersionCode: 110,
+    baseVersionCodes: [100],
+    platforms: ['windows', 'macos', 'linux'],
+    updateType: 'hot',
+    releaseScope: 'public',
+    userIds: [],
+    artifactId: 'artifact-1',
+    mandatory: false
+  }
   await app.releases.create(input, { idempotencyKey: 'stable-operation', requestId: 'request-1' })
   assert.deepEqual(JSON.parse(captured.data), input)
   assert.equal(captured.headers.get('idempotency-key'), 'stable-operation')

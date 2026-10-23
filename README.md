@@ -1,503 +1,244 @@
 # @eagleway/ota-cli
 
-用于调用 ota-api 的 CLI 与 SDK。
+OTA API v1 的命令行工具与 TypeScript SDK。支持共享包发布、客户端更新检查、安装上报、Socket 消息，以及第三方后台的统计、任务和应用审计查询。
 
-## 能力
+Node CLI / 上传工具要求 Node.js >= 18。SDK 提供独立的 ESM、CommonJS 和类型声明入口。
 
-- 通过命令行调用 ota-api 的全部现有接口
-- 导出 `check`、`success`、`error`、`appError`、`captureAppError` 五个 SDK 方法，兼容 React Native、Electron Renderer、Electron Main
-- 导出可注入适配器的 WS SDK，支持按 `otaName/userId/uniqueId` 订阅与收发 ACK 事件
-- 支持 `ota-cli.config.ts` 配置文件
-- 支持受保护接口自动登录换取 token
-- 支持 ESM、CommonJS、TypeScript 类型声明
+## 安装与入口
 
-## 安装
-
-```bash
+~~~bash
 npm install @eagleway/ota-cli axios
-```
-
-全局安装 CLI：
-
-```bash
+# 全局命令行
 npm install -g @eagleway/ota-cli axios
-```
+~~~
 
-说明：
+| 入口 | 运行环境与用途 |
+| --- | --- |
+| @eagleway/ota-cli | 客户端更新检查、安装与运行错误上报 |
+| @eagleway/ota-cli/manage | 受控后端的发布、消息与管理查询 |
+| @eagleway/ota-cli/node | Node 文件压缩、资源上传和发布编排 |
+| @eagleway/ota-cli/ws | 客户端 Socket.IO 订阅、更新与消息 ACK |
 
-- `axios` 作为 peer dependency，由外部项目决定安装版本
-- 仅在使用 WS 客户端时，才需要额外安装 `socket.io-client` 或注入自定义适配器
-- CLI 命令名仍然是 `ota-cli`
+axios 是 peer dependency，由接入项目提供。只有使用 Socket SDK 时才需要 socket.io-client，或自行注入适配器。React Native 和 Electron Renderer 不要导入 node 入口，也不要持有管理 Key。
 
-## 配置文件
+## API Key 与服务地址
 
-在执行命令的目录下创建 `ota-cli.config.ts`：
+baseURL 必须包含 /api/v1，例如 https://ota.example.com/api/v1；反向代理前缀可写为 https://example.com/ota/api/v1。
 
-```ts
-import type { OtaCliConfig } from '@eagleway/ota-cli'
+受保护命令从 OTA_ACCESS_KEY 环境变量取 Key，通过 CI Secret 或本机环境安全注入；配置和命令行不保存明文凭证。支持 --key-env 指定另一个环境变量。无需登录，也不会在本机缓存凭证。
 
-const config: OtaCliConfig = {
-  baseURL: 'http://127.0.0.1:3001',
-  timeout: 15000,
-  name: 'app-demo',
-  ver: 101,
-  platform: 'ios,android',
-  architecture: 'arm64,x64',
-  baseVersions: '100,101',
-  desc: '1.0.1 update',
-  mandatory: 1,
-  showDialog: 1,
-  iosPath: './dist/ios/main.bundle',
-  androidPath: './dist/android/index.bundle',
-  auth: {
-    username: 'admin',
-    password: '123456'
+401 表示 Key 无效、到期或撤销；403 表示应用授权或权限不足，不会自动重新认证或重放请求。已有 Key 追加应用授权后无需更换工具配置。
+
+Key 签发/撤销、应用授权调整、数据库初始化、应用准备和全局运维审计，均由服务端本地 yarn ota 命令管理。本工具不连接数据库、不替调用方扩展授权。发布用 publisher/full；查询按对应权限使用 observer/full；消息用 messenger/full。
+
+## 共享桌面热更新包
+
+在项目根目录创建 ota-cli.config.ts：
+
+~~~ts
+import type { OtaCliConfig } from '@eagleway/ota-cli/node'
+
+export default {
+  baseURL: 'https://ota.example.com/api/v1',
+  appName: 'desktop',
+  accessKeyEnv: 'OTA_ACCESS_KEY',
+  defaults: {
+    updateType: 'hot',
+    releaseScope: 'public',
+    userIds: [],
+    mandatory: false,
+    showUpdateDialog: true
   },
-  onSuccess(result) {
-    console.log('create/upload success', result)
-  },
-  onError(error) {
-    console.error('create/upload failed', error)
-  }
-}
-
-export default config
-```
-
-说明：
-
-- `baseURL` 可以写成 `http://127.0.0.1:3001`，内部会自动补成 `/api`
-- 命令行参数优先级高于配置文件
-- 受保护接口可传 `--token`
-- 也可传 `--auth-username` 和 `--auth-password` 自动登录
-- 如果没有 token 和账号密码，CLI 会在控制台交互输入账号密码
-- 登录成功后会把 token 缓存到本机，后续受保护命令优先复用缓存
-- 如果接口返回 `401` 或 `403`，CLI 会自动清除本机缓存 token，并重新登录后重试一次受保护请求
-- `OtaCliConfig` 支持 `CreatePayload` 的所有可选字段，`create` 和 `upload` 会优先使用命令行参数，其次回退到配置文件
-- `architecture` 支持逗号分隔多架构，例如 `arm64,x64`
-- `baseVersions` 表示适用基础版本，支持逗号分隔多版本，例如 `100,101`
-- `iosPath`、`androidPath`、`windowsPath`、`linuxPath`、`macosPath` 用于 `upload` 自动选择上传文件
-- `upload` 优先按 `--platform` 拆分后的平台顺序匹配对应 `*Path`，如果没有传 `--platform`，则按当前命令行运行环境匹配
-- `upload` 只接受 `.zip` 文件或目录：
-- 如果是 `.zip` 文件则直接上传
-- 如果是目录则先压缩成临时 `.zip` 再上传
-- 如果是其它类型则直接报错
-- `onSuccess` 和 `onError` 只在 CLI 的 `create`、`upload` 命令中执行，并接收实际结果或错误对象
-
-## CLI 用法
-
-查看帮助：
-
-```bash
-ota-cli --help
-ota-cli version --help
-```
-
-CLI 在执行时会输出关键过程日志，例如：
-
-- 加载配置
-- 是否命中本地 token 缓存
-- 是否触发登录
-- 接口调用开始与完成
-- 401/403 自动清理缓存 token
-- create/upload 的回调执行
-
-### 管理员接口
-
-创建管理员：
-
-```bash
-ota-cli admin create --base-url http://127.0.0.1:3001 --username admin --password 123456
-```
-
-登录：
-
-```bash
-ota-cli admin login --base-url http://127.0.0.1:3001 --username admin --password 123456
-```
-
-### 消息接口
-
-查询所有 userId 订阅，可通过 OTA 名称过滤：
-
-```bash
-ota-cli message list-user-id-subscriptions --name app-demo
-```
-
-发送全局通知：
-
-```bash
-ota-cli message send-global --data '{"ver":101}'
-```
-
-发送 OTA 名称通知：
-
-```bash
-ota-cli message send-ota-name --ota-name app-demo --data '{"ver":101}'
-```
-
-发送指定用户通知：
-
-```bash
-ota-cli message send-user-id --user-id user-1 --data '{"ver":101}'
-```
-
-需要重发缓存消息时可加 `--resend`：
-
-```bash
-ota-cli message send-user-id --user-id user-1 --resend
-```
-
-发送指定设备通知：
-
-```bash
-ota-cli message send-unique-id --unique-id device-1 --data '{"ver":101}'
-```
-
-需要重发缓存消息时可加 `--resend`：
-
-```bash
-ota-cli message send-unique-id --unique-id device-1 --resend
-```
-
-说明：
-
-- 新版 ota-api 使用 `message` 路由组
-- 所有消息接口均为受保护接口，CLI 会自动获取并携带 token
-
-### 版本接口
-
-分页查询版本数据：
-
-```bash
-ota-cli version list \
-  --name app-demo \
-  --page 1 \
-  --page-size 20 \
-  --platform ios \
-  --update-type full \
-  --enable 1
-```
-
-检查更新：
-
-```bash
-ota-cli version check --name app-demo --ver 100 --platform ios --channel appstore
-```
-
-也可以带上架构过滤：
-
-```bash
-ota-cli version check --name app-demo --ver 100 --platform ios --architecture arm64 --channel appstore
-```
-
-创建全量更新：
-
-```bash
-ota-cli version create \
-  --name app-demo \
-  --ver 101 \
-  --platform ios,android \
-  --architecture arm64,x64 \
-  --base-versions 100,101 \
-  --desc "1.0.1 full update" \
-  --install-url https://cdn.example.com/app-demo-1.0.1.apk \
-  --mandatory 1 \
-  --show-dialog 1 \
-  --auth-username admin \
-  --auth-password 123456
-```
-
-上传热更新包：
-
-```bash
-ota-cli version upload \
-  --name app-demo \
-  --ver 101 \
-  --platform ios,android \
-  --architecture arm64,x64 \
-  --base-versions 100,101 \
-  --desc "1.0.1 hot update" \
-  --show-dialog 1 \
-  --auth-username admin \
-  --auth-password 123456
-```
-
-如果没有传 `--file`，CLI 会尝试从 `ota-cli.config.ts` 的 `iosPath`、`androidPath` 等字段自动解析上传文件。
-
-`--base-versions` / `baseVersions` 字段描述：适用基础版本(多版本用逗号拼接 `100,101`)。
-
-上传文件规则：
-
-- `.zip` 文件会直接上传
-- 目录会被压缩成临时 `.zip` 后上传
-- 其它文件类型会直接报错
-
-上报更新成功：
-
-```bash
-ota-cli version success \
-  --name app-demo \
-  --platform ios \
-  --ver 101 \
-  --ver-id 12 \
-  --username byron \
-  --extras '{"device":"iphone"}'
-```
-
-上报更新失败：
-
-```bash
-ota-cli version error \
-  --name app-demo \
-  --platform ios \
-  --ver 101 \
-  --ver-id 12 \
-  --message "apply patch failed" \
-  --extras '{"device":"iphone"}'
-```
-
-上报应用闪退或运行时报错：
-
-```bash
-ota-cli version app-error \
-  --name app-demo \
-  --platform ios \
-  --ver 101 \
-  --kind crash \
-  --message "app crashed on startup" \
-  --stack "Error: crash\n    at bootstrap (index.bundle:1:100)" \
-  --extras '{"device":"iphone","osVersion":"18.0"}'
-```
-
-说明：
-
-- `--kind` 只接受 `crash` 或 `error`
-
-更新已有错误记录：
-
-```bash
-ota-cli version error \
-  --id 5 \
-  --name app-demo \
-  --platform ios \
-  --ver 101 \
-  --ver-id 12 \
-  --message "retry failed"
-```
-
-## SDK 用法
-
-### React Native / Electron
-
-```ts
-import { appError, captureAppError, check, success, error } from '@eagleway/ota-cli'
-
-const baseURL = 'http://127.0.0.1:3001'
-
-const latest = await check(
-  { baseURL },
-  {
-    name: 'app-demo',
-    ver: 100,
-    platform: 'ios',
-    channel: 'appstore'
-  }
-)
-
-await success(
-  { baseURL },
-  {
-    name: 'app-demo',
-    platform: 'ios',
-    ver: 101,
-    verId: 12,
-    extras: {
-      device: 'iphone'
+  targets: {
+    desktop: {
+      file: './dist/desktop-update.zip',
+      platforms: ['windows', 'macos', 'linux'],
+      baseVersionCodes: [100]
     }
   }
-)
+} satisfies OtaCliConfig
+~~~
 
-await error(
-  { baseURL },
-  {
-    name: 'app-demo',
-    platform: 'ios',
-    ver: 101,
-    verId: 12,
-    message: 'apply patch failed',
-    extras: {
-      device: 'iphone'
-    }
-  }
-)
+~~~bash
+ota-cli release deploy --target desktop --target-version-code 110 --dry-run
+ota-cli release deploy --target desktop --target-version-code 110 --wait --json
+~~~
 
-await appError(
-  { baseURL },
-  {
-    name: 'app-demo',
-    platform: 'ios',
-    ver: 101,
-    kind: 'crash',
-    message: 'app crashed on startup',
-    stack: 'Error: crash\n    at bootstrap (index.bundle:1:100)',
-    extras: {
-      device: 'iphone'
-    }
-  }
-)
+同一份包、同一套发布策略：只上传一次、创建一条草稿、发布一次，同时覆盖三个平台。目标不是平台的同义词，不根据执行机器猜测平台。
 
-await captureAppError(
-  { baseURL },
-  {
-    name: 'app-demo',
-    platform: 'ios',
-    ver: 101,
-    kind: 'error',
-    error: new Error('network request failed'),
-    extras: {
-      device: 'iphone'
-    }
-  }
-)
-```
+同一应用中，相同 ZIP 即使路径不同，也按最终 ZIP 的 SHA-256 在一次 Publisher 执行内复用；同一目录只压缩一次，目录条目排序并固定 ZIP 日期。不同渠道/名单策略可配置多个目标，共用 file；同一次 deploy --target stable,beta 只上传一次，再创建各自发布。不同应用不自动复用资源；独立命令执行不共享永久上传缓存。也可显式使用已有 artifactId 创建发布。
 
-### 创建客户端
+目录内不接受符号链接；上传源只能是 ZIP 或目录。多个目标分别报告结果，不提供跨发布事务。任一目标失败时退出码为 1，已完成的发布不会被回滚。
 
-```ts
-import { createOtaClient } from '@eagleway/ota-cli'
+## 分阶段发布与恢复
 
-const client = createOtaClient({
-  baseURL: 'http://127.0.0.1:3001',
-  token: 'your-token'
+~~~bash
+# 只上传资源
+ota-cli artifact upload --app desktop --file ./dist/desktop-update.zip
+
+# release.json 使用正式 DraftInput JSON 字段，包含 artifactId 或对应下载 URL
+ota-cli release create --app desktop --input release.json --idempotency-key YOUR_OPERATION_ID
+
+# 只在显式 publish/deploy 时发布
+ota-cli release publish --app desktop --id RELEASE_UUID
+
+ota-cli release list --app desktop --status draft
+ota-cli release show --app desktop --id RELEASE_UUID
+ota-cli release update --app desktop --id RELEASE_UUID --input patch.json
+ota-cli release disable --app desktop --id RELEASE_UUID
+ota-cli release enable --app desktop --id RELEASE_UUID
+ota-cli release redispatch --app desktop --id RELEASE_UUID
+ota-cli release users --app desktop --id RELEASE_UUID
+ota-cli release set-users --app desktop --id RELEASE_UUID --input users.json --expected-revision 1
+ota-cli release set-scope --app desktop --id RELEASE_UUID --scope allowlist --expected-revision 2
+~~~
+
+DraftInput 使用 targetVersionCode、baseVersionCodes 数组、platforms 数组、updateType、releaseScope 和 userIds 数组，布尔值为 true/false。userId 格式为 appName:platform:businessId，必须匹配应用和平台。全量发布可单独配置不带 file 的目标，使用 updateType=full、baseVersionCodes=[] 和 installerSourceUrl；工具不上传 APK/EXE/DMG 安装文件。
+
+deploy 默认把不含 API Key 的状态保存到当前目录 .ota-cli/deployments/，也可通过 --state 指定新文件。文件含应用、资源/发布 ID、幂等键及阶段，使用 0600 权限；不要提交到 Git。支持单目标恢复：
+
+~~~bash
+ota-cli release deploy --target desktop --target-version-code 110 --resume .ota-cli/deployments/DEPLOYMENT_UUID.json
+~~~
+
+恢复时保留相同发布参数及源文件内容。草稿创建重用原幂等键，发布重用原 releaseId。上传响应丢失时没有资源查询幂等保证，工具会停止并提示结果未知，不自动重新上传；先核对服务端再决定新建执行。状态文件的 .lock 表示正在执行或上次异常退出，确认没有相关进程后才可人工移除。
+
+--wait 只等待分发任务；不代表客户端下载、接收或安装成功。任务失败或等待超时不回滚已发布版本。恢复时若服务端未返回 taskId，使用 release delivery/task list 查询。网络请求默认不自动重试。
+
+onPublished/onError 可配置异步回调；发布后回调失败会返回警告，不把远端发布改报为失败。
+
+恢复路径以命令输出的 stateFile 为准；示例中的 UUID 路径需要替换为实际文件。开发验证使用 Node.js 22。
+
+## 查询与消息 CLI
+
+~~~bash
+ota-cli statistics summary --app desktop --release-sequence 1
+ota-cli telemetry successes --app desktop --page-size 100
+ota-cli telemetry failures --app desktop
+ota-cli telemetry app-errors --app desktop --kind crash
+ota-cli task list --app desktop --status running
+ota-cli task show --app desktop --id TASK_UUID
+ota-cli task logs --app desktop --id TASK_UUID
+ota-cli task wait --app desktop --id TASK_UUID --wait-timeout 300000
+ota-cli release delivery --app desktop --id RELEASE_UUID
+ota-cli audit list --app desktop --operation-id OPERATION_UUID
+ota-cli message subscriptions --app desktop
+ota-cli message application --app desktop --data '{"notice":"maintenance"}'
+ota-cli message user --app desktop --user-id desktop:windows:42 --data '{"refresh":true}'
+ota-cli message device --app desktop --unique-id device-1 --resend
+~~~
+
+消息支持 --data-file 读取任意合法 JSON，不能与 --data 同用。普通应用消息与 OTA 重新分发相互独立。
+
+分页查询支持 --page/--page-size（最多 100）、--from/--to；汇总不分页。默认时间范围由服务端决定（最近 30 天），单次最多 90 天。任务和审计永久保存，查更早数据需显式传时间并分段查询，不是只能保存 90 天。
+
+原样保留分页元数据、任务/日志 snake_case 字段和 retention 等声明。成功/失败计数是上报记录数；错误组 reportCount 是聚合累计数；分发计数不是独立接收人数。应用审计可能分段，需读取各页再按 operation_id/part_no 组织完整差异。这里不提供服务器标准输出、PM2 文件或全局运维审计查询。
+
+## 客户端 SDK
+
+~~~ts
+import { createAppClient } from '@eagleway/ota-cli'
+
+const app = createAppClient({
+  baseURL: 'https://ota.example.com/api/v1',
+  appName: 'desktop'
 })
 
-const token = await client.admin.login({
-  username: 'admin',
-  password: '123456'
+const update = await app.checkUpdate({
+  platform: 'windows',
+  architecture: 'x64',
+  nativeVersionCode: 100,
+  installedReleaseSequence: 0,
+  distributionChannel: 'stable'
 })
+~~~
 
-const authenticatedClient = createOtaClient({
-  baseURL: 'http://127.0.0.1:3001',
-  token
-})
+无更新返回 null。nativeVersionCode 是原生安装基础版本，不是热更新后的展示版本；installedReleaseSequence 是实际已加载发布的序号，不是 UUID。全量使用 installerSourceUrl，热更新使用 bundleUrl。
 
-const subscribedUserIds = await authenticatedClient.message.listSubscribedUserIds('app-demo')
+app.reportSuccess / app.reportFailure 使用 platform、versionCode、releaseSequence，可带 reportedUsername、extras 和 reportId。reportId 由业务为一次安装事件生成并保存，重试同一事件时沿用原 UUID 与相同内容；SDK 不替每次请求生成新 ID。无键上报逐次计数。只有实际重启并确认加载后才上报成功。
 
-const versions = await authenticatedClient.version.list('app-demo', {
-  page: 1,
-  pageSize: 20,
-  platform: 'android'
-})
+app.reportAppError 接收 kind/message/stack；app.captureAppError(error, context) 可规范化异常。它们不携带 releaseSequence/reportId。extras 保持 JSON 类型，不转换业务键名。
 
-await authenticatedClient.message.sendGlobal({
-  data: {
-    ver: 101
-  }
-})
+CLI 调试入口：
 
-const version = await client.version.check({
-  name: 'app-demo',
-  ver: 100,
-  platform: 'android'
-})
-```
+~~~bash
+ota-cli app check --app desktop --platform windows --native-version-code 100
+ota-cli app success --app desktop --input success.json
+ota-cli app failure --app desktop --input failure.json
+ota-cli app app-error --app desktop --input app-error.json
+~~~
 
-### Node.js 热更新上传
+## 第三方后台与 Node SDK
 
-服务端或其它 Node.js 环境可以通过 Node 专用入口上传 ZIP 文件或目录。目录会先压缩为临时 ZIP，上传完成后自动清理。
+~~~ts
+import { createManageClient } from '@eagleway/ota-cli/manage'
 
-```ts
-import { uploadVersion } from '@eagleway/ota-cli/node'
+const accessKey = process.env.OTA_ACCESS_KEY
+if (!accessKey) throw new Error('Missing OTA_ACCESS_KEY')
 
-const version = await uploadVersion(
-  {
-    baseURL: 'http://127.0.0.1:3001/api',
-    token: 'your-token'
-  },
-  './dist/windows.zip',
-  {
-    name: 'app-demo',
-    ver: 101,
-    platform: 'windows',
-    architecture: 'x64',
-    baseVersions: '100',
-    desc: '1.0.1 hot update',
-    enable: 1,
-    mandatory: 0,
-    showDialog: 1
-  }
-)
-```
+const app = createManageClient({
+  baseURL: 'https://ota.example.com/api/v1',
+  accessKey
+}).forApp('desktop')
 
-该入口依赖 Node.js 文件系统，不应在 React Native 或 Electron Renderer 中导入。
+const statistics = await app.statistics.summary()
+const tasks = await app.tasks.list({ pageSize: 100 })
+const audit = await app.audit.list({ operationId: 'OPERATION_UUID' })
+~~~
 
-### WS 客户端
+Manage SDK 供受控后端使用，由第三方后台自行认证其用户。不要将这些凭证和调用放进浏览器页面。
 
-包本身不再内置 `socket.io-client`。只有在使用 WS 客户端时，才需要在调用方项目里安装并显式加载适配器。
+Node 入口提供 createPublisher、uploadArtifact 和 waitForTask。Publisher 的多次 uploadArtifact/deploy 可在当前实例内复用同应用资源；deployMany 会先校验所有目标并准备所有文件，再逐项执行。务必 finally 调用 publisher.close() 清理临时 ZIP。Node SDK 仅在显式设置 stateFile 时写恢复状态；CLI 则默认保存。
 
-```bash
+## Socket SDK
+
+~~~bash
 npm install socket.io-client
-```
+~~~
 
-```ts
-import { createWsClient, loadSocketIoAdapter } from '@eagleway/ota-cli/ws'
-
-await loadSocketIoAdapter()
+~~~ts
+import { io } from 'socket.io-client'
+import { createWsClient } from '@eagleway/ota-cli/ws'
 
 const ws = createWsClient({
-  baseURL: 'http://127.0.0.1:3001',
-  debug: true
+  serverURL: 'https://ota.example.com',
+  adapter: io,
+  path: '/socket.io'
 })
-
-ws.connect()
-
-const unsubscribeOta = ws.onOtaName('app-demo', payload => {
-  console.log('ota message:', payload)
+ws.onError(error => console.error(error.message))
+ws.onUpdate('desktop', release => {
+  // enabled=false 是服务端撤销之前推送版本的通知；由业务决定处理方式。
 })
-
-await ws.subscribeOtaName({
-  otaName: 'app-demo',
-  platform: 'ios',
-  architecture: 'arm64',
-  channel: 'appstore',
-  ver: 100
+ws.onApplicationMessage('desktop', message => {
+  // 普通应用消息，不是 OTA 更新。
 })
-
-const unsubscribeUser = ws.onUserId('app-demo_user-1', payload => {
-  console.log('user message envelope:', payload)
-  if (payload.ackRequired && payload.messageId) {
-    void ws.ackUserId({
-      userId: 'app-demo_user-1',
-      messageId: payload.messageId
-    })
-  }
+await ws.subscribeApp({
+  appName: 'desktop',
+  platform: 'windows',
+  nativeVersionCode: 100,
+  installedReleaseSequence: 0
 })
+await ws.subscribeUser('desktop:windows:42')
+await ws.subscribeDevice({ appName: 'desktop', uniqueId: 'device-1' })
+~~~
 
-await ws.subscribeUserId('app-demo_user-1')
+Socket 只走 WebSocket transport，不携带 API Key。浏览器/RN 推荐显式注入 io；Node 环境也可 await loadSocketIoAdapter() 得到适配器。serverURL 为 origin；反向代理路径通过 path 单独指定。
 
-await ws.emitWithAck('ping', { ts: Date.now() })
+onUserMessage/onDeviceMessage 接收 TargetedMessage 信封。业务成功处理后，使用 ackUser({ userId, messageId }) 或 ackDevice({ appName, uniqueId, messageId })；SDK 不自动提前 ACK。相同设备 ID 按应用隔离。
 
-unsubscribeOta()
-unsubscribeUser()
-await ws.unsubscribeOtaName('app-demo')
-await ws.unsubscribeUserId('app-demo_user-1')
-ws.disconnect()
-```
+重连会恢复当前订阅和最后一次订阅上下文；实际加载版本后再次 subscribeApp 更新 installedReleaseSequence。unsubscribeApp/unsubscribeUser/unsubscribeDevice 同时移除重连意图。suspend 保留意图，connect 恢复；disconnect 完全释放实例，之后重新创建。
 
-说明：
+## 配置、输出与验证
 
-- 默认会从 `baseURL` 推导 WS 地址为 `origin + /socket.io`
-- 默认只走 websocket 传输，并启用 socket.io 重连
-- `subscribeOtaName/subscribeUserId/subscribeUniqueId` 走 ACK 机制
-- `onUserId/onUniqueId` 会收到带 `messageId` 的消息信封；当 `ackRequired=true` 时可调用 `ackUserId/ackUniqueId`
-- 移动端和桌面端可共用同一套 API
-- 如果你不用 socket.io-client，也可以通过 `configureWsAdapter()` 注入自定义实现
+配置发现顺序为 ota-cli.config.ts/js/mjs/cjs，支持导出对象或返回对象的异步函数。--config 指定文件；--no-config 禁用配置。file 相对配置文件目录解析，显式 --file 相对执行目录解析。
 
-## 发布
+可配置 profiles，使用 --profile NAME 选择 baseURL/appName/accessKeyEnv/timeout/uploadTimeout。服务地址优先级为命令行 > OTA_BASE_URL > profile > 根配置；应用为 --app > 目标应用 > profile/根配置。选中的凭证变量缺失时不回退其它 Key。
 
-```bash
-npm run build
-# 带 Scope 的包默认是私有的，直接发布可能会失败，需要添加 --access public 参数
-npm publish --access public
-```
+所有成功结果以 JSON 写 stdout，诊断和配置/回调日志写 stderr，支持 --json 显式声明机器调用。多目标失败输出逐项结果并退出 1；单命令失败在 stderr 输出结构化错误。--request-id 可关联服务端审计。--timeout 控制普通请求；--upload-timeout 控制上传（默认 150 秒）；等待任务有独立 --wait-timeout。
+
+~~~bash
+pnpm install --frozen-lockfile
+pnpm test:verify
+~~~
+
+测试集中在 test/。构建同时验证 ESM/CJS 导出、类型声明和配置示例；测试覆盖本机 HTTP/CLI、浏览器打包、Socket 生命周期和发布恢复。测试不访问生产库、业务服务或 OSS。真实客户端、OSS 和目标服务联调仍需单独验收。构建及验证不会发布 npm 包。
