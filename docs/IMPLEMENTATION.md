@@ -1,0 +1,10 @@
+# OTA API v1 implementation
+
+- [x] Separate App and Manage contracts, transport and API Key authentication.
+- [ ] Application-aware Socket SDK and reconnection lifecycle.
+- [ ] Shared-artifact publishing, per-stage recovery, release CLI.
+- [ ] Query/message CLI, complete tests, examples and package verification.
+
+This branch targets 1.0.0. Only /api/v1 contracts are exposed.
+Database provisioning and API Key administration remain server-local operations.
+No npm publication is performed by development or verification commands.

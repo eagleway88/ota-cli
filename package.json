@@ -1,6 +1,6 @@
 {
   "name": "@eagleway/ota-cli",
-  "version": "0.2.7",
+  "version": "1.0.0",
   "description": "CLI and SDK for ota-api",
   "license": "MIT",
   "type": "module",
@@ -15,6 +15,11 @@
     "README.md"
   ],
   "exports": {
+    "./manage": {
+      "types": "./dist/manage.d.ts",
+      "import": "./dist/manage.js",
+      "require": "./dist/manage.cjs"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -35,16 +40,18 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsup",
-    "clean": "rimraf dist"
+    "build": "rimraf dist && tsup",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1",
+    "test:verify": "pnpm typecheck && pnpm build && pnpm test"
   },
   "dependencies": {
     "archiver": "^7.0.1",
     "commander": "^12.1.0",
     "form-data": "^4.0.2",
     "jiti": "^2.4.2",
-    "picocolors": "^1.1.1",
-    "prompts": "^2.4.2"
+    "picocolors": "^1.1.1"
   },
   "peerDependencies": {
     "axios": ">=1 <2"
@@ -52,7 +59,6 @@
   "devDependencies": {
     "@types/archiver": "^7.0.0",
     "@types/node": "^22.14.1",
-    "@types/prompts": "^2.4.9",
     "axios": "^1.13.6",
     "rimraf": "^6.0.1",
     "tsup": "^8.4.0",

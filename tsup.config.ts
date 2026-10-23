@@ -4,6 +4,7 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
+      manage: 'src/manage/index.ts',
       ws: 'src/ws.ts',
       node: 'src/node.ts'
     },
@@ -11,7 +12,7 @@ export default defineConfig([
     external: ['axios'],
     dts: true,
     sourcemap: true,
-    clean: true,
+    clean: false,
     target: 'es2020',
     outDir: 'dist'
   },
