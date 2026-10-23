@@ -2,7 +2,7 @@
 
 - [x] Separate App and Manage contracts, transport and API Key authentication.
 - [x] Application-aware Socket SDK and reconnection lifecycle.
-- [ ] Shared-artifact publishing, per-stage recovery, release CLI.
+- [x] Shared-artifact publishing, per-stage recovery, release CLI.
 - [ ] Query/message CLI, complete tests, examples and package verification.
 
 This branch targets 1.0.0. Only /api/v1 contracts are exposed.

@@ -1,23 +1,26 @@
-import type { OtaCliConfig } from '@eagleway/ota-cli'
+import type { OtaCliConfig } from '@eagleway/ota-cli/node'
 
 const config: OtaCliConfig = {
-  baseURL: 'http://127.0.0.1:3001',
-  timeout: 15000,
-  name: 'app-demo',
-  ver: 101,
-  platform: 'ios',
-  architecture: 'arm64',
-  baseVersions: '100,101',
-  desc: '1.0.1 update',
-  mandatory: 1,
-  iosPath: './test/ios',
-  androidPath: './test/android',
-  onSuccess(result) {
-    console.log('create/upload success', result)
+  baseURL: 'http://127.0.0.1:3001/api/v1',
+  appName: 'app-demo',
+  accessKeyEnv: 'OTA_ACCESS_KEY',
+  defaults: {
+    updateType: 'hot',
+    releaseScope: 'public',
+    userIds: [],
+    mandatory: false,
+    showUpdateDialog: true
   },
-  onError(error) {
-    console.error('create/upload failed', error)
+  targets: {
+    desktop: {
+      file: './dist/desktop-update.zip',
+      targetVersionCode: 110,
+      baseVersionCodes: [100],
+      platforms: ['windows', 'macos', 'linux']
+    }
+  },
+  onPublished(result) {
+    console.info('Published release:', result.releaseId)
   }
 }
-
 export default config
