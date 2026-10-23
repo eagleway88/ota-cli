@@ -43,7 +43,7 @@
     "build": "rimraf dist && tsup",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --test-concurrency=1",
+    "test": "node test/run.cjs",
     "test:verify": "pnpm typecheck && pnpm build && pnpm test"
   },
   "dependencies": {

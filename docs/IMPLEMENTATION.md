@@ -1,7 +1,7 @@
 # OTA API v1 implementation
 
 - [x] Separate App and Manage contracts, transport and API Key authentication.
-- [ ] Application-aware Socket SDK and reconnection lifecycle.
+- [x] Application-aware Socket SDK and reconnection lifecycle.
 - [ ] Shared-artifact publishing, per-stage recovery, release CLI.
 - [ ] Query/message CLI, complete tests, examples and package verification.
 
