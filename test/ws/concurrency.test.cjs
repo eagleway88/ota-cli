@@ -8,12 +8,12 @@ test('a queued subscription replacement explicitly rejects the superseded intent
   const first = client.subscribeApp({
     appName: 'desktop',
     platform: 'windows',
-    nativeVersionCode: 100
+    currentVersion: '1.3.10'
   })
   const second = client.subscribeApp({
     appName: 'desktop',
     platform: 'windows',
-    nativeVersionCode: 100,
+    currentVersion: '1.3.10',
     installedReleaseSequence: 2
   })
   await assert.rejects(first, /superseded/)

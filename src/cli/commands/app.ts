@@ -17,7 +17,7 @@ export function registerApp(program: Command) {
     app
       .command('check')
       .requiredOption('--platform <platform>')
-      .requiredOption('--native-version-code <number>')
+      .requiredOption('--current-version <version>')
       .option('--installed-release-sequence <number>')
       .option('--architecture <architecture>')
       .option('--distribution-channel <channel>')
@@ -26,7 +26,7 @@ export function registerApp(program: Command) {
       client(ctx).checkUpdate(
         {
           platform: String(ctx.args.platform) as Platform,
-          nativeVersionCode: numberOption(ctx.args.nativeVersionCode, 'nativeVersionCode'),
+          currentVersion: String(ctx.args.currentVersion),
           installedReleaseSequence:
             ctx.args.installedReleaseSequence !== undefined
               ? numberOption(ctx.args.installedReleaseSequence, 'installedReleaseSequence')

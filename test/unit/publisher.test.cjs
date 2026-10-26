@@ -5,8 +5,7 @@ const path = require('node:path')
 const { createPublisher, DeploymentError, waitForTask } = require('../../dist/node.cjs')
 const { fixture } = require('../fixtures/api.cjs')
 const release = {
-  targetVersionCode: 110,
-  baseVersionCodes: [100],
+  targetVersion: '1.3.10',
   platforms: ['windows', 'macos', 'linux'],
   updateType: 'hot',
   releaseScope: 'public',
@@ -121,7 +120,7 @@ test('resume refuses changed content or intent and does not overwrite an existin
   await assert.rejects(publisher.deploy(target(f), { stateFile }), /EEXIST/)
   await assert.rejects(
     publisher.deploy(
-      { ...target(f), release: { ...release, targetVersionCode: 120 } },
+      { ...target(f), release: { ...release, targetVersion: '1.3.11' } },
       { stateFile, resume: true }
     ),
     /does not match/
@@ -161,7 +160,6 @@ test('full releases can publish an installer URL without uploading a ZIP', async
     release: {
       ...release,
       updateType: 'full',
-      baseVersionCodes: [],
       installerSourceUrl: 'https://example.test/app.exe'
     }
   })

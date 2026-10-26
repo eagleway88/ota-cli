@@ -12,6 +12,7 @@ import type {
 } from '../contracts'
 import {
   appName,
+  appVersion,
   checkInput,
   integer,
   jsonValue,
@@ -28,9 +29,9 @@ export function createAppClient(options: AppOptions) {
   const root = 'app/apps/' + encodeURIComponent(app)
   const report = (input: ReportInput, extraKeys: string[]) => {
     object(input)
-    knownKeys(input, ['platform', 'versionCode', 'reportedUsername', 'extras', ...extraKeys])
+    knownKeys(input, ['platform', 'version', 'reportedUsername', 'extras', ...extraKeys])
     platform(input.platform)
-    integer(input.versionCode, 'versionCode')
+    appVersion(input.version, 'version')
     if (input.reportedUsername !== undefined && input.reportedUsername !== null)
       text(input.reportedUsername, 'reportedUsername')
     if (input.extras !== undefined) jsonValue(input.extras)

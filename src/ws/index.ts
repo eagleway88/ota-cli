@@ -231,7 +231,7 @@ export class OtaWsClient {
     knownKeys(input, [
       'appName',
       'platform',
-      'nativeVersionCode',
+      'currentVersion',
       'installedReleaseSequence',
       'architecture',
       'distributionChannel'

@@ -5,8 +5,7 @@ const path = require('node:path')
 const { fixture } = require('../fixtures/api.cjs')
 const { cli } = require('../fixtures/cli.cjs')
 const release = {
-  targetVersionCode: 110,
-  baseVersionCodes: [100],
+  targetVersion: '1.3.10',
   platforms: ['windows', 'macos', 'linux'],
   updateType: 'hot',
   releaseScope: 'public',

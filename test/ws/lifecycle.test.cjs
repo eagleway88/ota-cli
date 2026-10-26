@@ -25,7 +25,7 @@ test('application subscription uses native context and separates updates from me
   await client.subscribeApp({
     appName: 'a',
     platform: 'windows',
-    nativeVersionCode: 100,
+    currentVersion: '1.3.10',
     installedReleaseSequence: 2
   })
   assert.equal(socket.calls[0].event, 'app:subscribe')
@@ -44,11 +44,11 @@ test('application subscription uses native context and separates updates from me
 })
 test('reconnection restores only current subscriptions, with the latest loaded release context', async () => {
   const { client, socket } = fixture()
-  await client.subscribeApp({ appName: 'a', platform: 'windows', nativeVersionCode: 100 })
+  await client.subscribeApp({ appName: 'a', platform: 'windows', currentVersion: '1.3.10' })
   await client.subscribeApp({
     appName: 'a',
     platform: 'windows',
-    nativeVersionCode: 100,
+    currentVersion: '1.3.10',
     installedReleaseSequence: 2
   })
   await client.subscribeUser('a:windows:42')
@@ -88,7 +88,7 @@ test('server error ACKs are rejected; reconnect failures reach error handlers wi
   const { client, socket } = fixture()
   socket.nextResponse = { error: 'Invalid application subscription' }
   await assert.rejects(
-    client.subscribeApp({ appName: 'a', platform: 'ios', nativeVersionCode: 100 }),
+    client.subscribeApp({ appName: 'a', platform: 'ios', currentVersion: '1.3.10' }),
     /Invalid application/
   )
   const errors = []

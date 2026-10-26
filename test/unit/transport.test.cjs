@@ -43,7 +43,7 @@ test('App and Manage entry points are separate and apps never inherit global axi
   const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a', adapter })
   assert.equal(app.admin, undefined)
   assert.equal(app.releases, undefined)
-  assert.equal(await app.checkUpdate({ platform: 'windows', nativeVersionCode: 100 }), null)
+  assert.equal(await app.checkUpdate({ platform: 'windows', currentVersion: '1.3.10' }), null)
   assert.equal(calls[0].headers.get('Authorization'), undefined)
   assert.equal(calls[0].auth, undefined)
   assert.equal(calls[0].url, 'app/apps/app-a/updates/check')
@@ -72,14 +72,17 @@ test('App and Manage entry points are separate and apps never inherit global axi
 })
 test('strict inputs use numbers and exact app context', () => {
   const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a' })
-  assert.throws(() => app.checkUpdate({ platform: 'windows', nativeVersionCode: '100' }), /integer/)
   assert.throws(
-    () => app.checkUpdate({ platform: 'windows', nativeVersionCode: 100, ver: 100 }),
+    () => app.checkUpdate({ platform: 'windows', currentVersion: '100' }),
+    /display version/
+  )
+  assert.throws(
+    () => app.checkUpdate({ platform: 'windows', currentVersion: '1.3.10', ver: 100 }),
     /Unknown/
   )
   assert.throws(
     () =>
-      app.checkUpdate({ platform: 'windows', nativeVersionCode: 100, userId: 'app-b:windows:1' }),
+      app.checkUpdate({ platform: 'windows', currentVersion: '1.3.10', userId: 'app-b:windows:1' }),
     /must match/
   )
 })
@@ -122,7 +125,7 @@ test('invalid envelopes fail closed, business errors retain their metadata', asy
       adapter: async (config) => response(config, payload)
     })
     await assert.rejects(
-      app.checkUpdate({ platform: 'ios', nativeVersionCode: 1 }),
+      app.checkUpdate({ platform: 'ios', currentVersion: '1.0.0' }),
       (error) => error.code === code && error.status === 200
     )
   }

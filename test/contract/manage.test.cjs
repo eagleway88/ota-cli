@@ -91,7 +91,7 @@ test('invalid filters, partial fields and JSON are rejected before HTTP', () => 
       () =>
         appClient.reportSuccess({
           platform: 'windows',
-          versionCode: 1,
+          version: '1.0.0',
           releaseSequence: 1,
           extras
         }),

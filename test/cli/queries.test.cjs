@@ -74,14 +74,14 @@ test('public CLI never sends an API Key, including when a key is present in the 
     'check',
     '--platform',
     'windows',
-    '--native-version-code',
-    '100'
+    '--current-version',
+    '1.3.10'
   ])
   assert.equal(check.code, 0, check.stderr)
   const input = path.join(f.directory, 'report.json')
   await writeFile(
     input,
-    JSON.stringify({ platform: 'windows', versionCode: 110, releaseSequence: 1, extras: false })
+    JSON.stringify({ platform: 'windows', version: '1.3.10', releaseSequence: 1, extras: false })
   )
   const report = await cli(f, [...base, 'app', 'success', '--input', input], { OTA_ACCESS_KEY: '' })
   assert.equal(report.code, 0, report.stderr)

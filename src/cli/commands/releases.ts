@@ -17,8 +17,7 @@ function target(ctx: CliContext, name: string) {
   if (!configured) throw new Error('Unknown release target: ' + name)
   const { file, appName: targetApp, ...release } = configured
   const merged = { ...ctx.config.defaults, ...release } as DraftInput
-  if (ctx.args.targetVersionCode !== undefined)
-    merged.targetVersionCode = numberOption(ctx.args.targetVersionCode, 'targetVersionCode')
+  if (ctx.args.targetVersion !== undefined) merged.targetVersion = String(ctx.args.targetVersion)
   if (ctx.args.updateType !== undefined)
     merged.updateType = String(ctx.args.updateType) as DraftInput['updateType']
   if (ctx.args.releaseNotes !== undefined) merged.releaseNotes = String(ctx.args.releaseNotes)
@@ -153,7 +152,7 @@ export function registerReleases(program: Command) {
     release
       .command('deploy')
       .requiredOption('--target <name[,name]>')
-      .option('--target-version-code <number>')
+      .option('--target-version <version>')
       .option('--update-type <hot|full>')
       .option('--release-notes <text>')
       .option('--installer-source-url <url>')

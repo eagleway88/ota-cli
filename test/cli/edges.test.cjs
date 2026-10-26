@@ -26,8 +26,7 @@ test('configuration logs and callback warnings cannot corrupt JSON or expose API
         targets: {
           desktop: {
             file: f.zip,
-            targetVersionCode: 110,
-            baseVersionCodes: [100],
+            targetVersion: '1.3.10',
             platforms: ['windows', 'macos', 'linux'],
             updateType: 'hot',
             releaseScope: 'public',

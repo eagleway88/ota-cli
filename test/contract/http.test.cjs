@@ -21,7 +21,7 @@ test('public reports preserve JSON and reportId without body appName or key', as
   })
   const payload = {
     platform: 'windows',
-    versionCode: 110,
+    version: '1.3.10',
     releaseSequence: 1,
     reportId: '12345678-1234-4123-8123-123456789abc',
     extras: { num: 1, flag: false, nested: [null, 'x'] }
@@ -30,7 +30,7 @@ test('public reports preserve JSON and reportId without body appName or key', as
   await app.reportFailure({ ...payload, message: 'failed' })
   await app.captureAppError(new Error('crash'), {
     platform: 'windows',
-    versionCode: 110,
+    version: '1.3.10',
     extras: false
   })
   assert.deepEqual(JSON.parse(calls[0].data), payload)
@@ -56,8 +56,7 @@ test('a shared desktop ZIP needs one draft covering three platforms', async () =
     }
   }).forApp('desktop')
   const input = {
-    targetVersionCode: 110,
-    baseVersionCodes: [100],
+    targetVersion: '1.3.10',
     platforms: ['windows', 'macos', 'linux'],
     updateType: 'hot',
     releaseScope: 'public',

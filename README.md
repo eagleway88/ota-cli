@@ -53,15 +53,14 @@ export default {
     desktop: {
       file: './dist/desktop-update.zip',
       platforms: ['windows', 'macos', 'linux'],
-      baseVersionCodes: [100]
     }
   }
 } satisfies OtaCliConfig
 ~~~
 
 ~~~bash
-ota-cli release deploy --target desktop --target-version-code 110 --dry-run
-ota-cli release deploy --target desktop --target-version-code 110 --wait --json
+ota-cli release deploy --target desktop --target-version 1.3.10 --dry-run
+ota-cli release deploy --target desktop --target-version 1.3.10 --wait --json
 ~~~
 
 同一份包、同一套发布策略：只上传一次、创建一条草稿、发布一次，同时覆盖三个平台。目标不是平台的同义词，不根据执行机器猜测平台。
@@ -93,12 +92,12 @@ ota-cli release set-users --app desktop --id RELEASE_UUID --input users.json --e
 ota-cli release set-scope --app desktop --id RELEASE_UUID --scope allowlist --expected-revision 2
 ~~~
 
-DraftInput 使用 targetVersionCode、baseVersionCodes 数组、platforms 数组、updateType、releaseScope 和 userIds 数组，布尔值为 true/false。userId 格式为 appName:platform:businessId，必须匹配应用和平台。全量发布可单独配置不带 file 的目标，使用 updateType=full、baseVersionCodes=[] 和 installerSourceUrl；工具不上传 APK/EXE/DMG 安装文件。
+DraftInput 使用显示版本字符串 targetVersion（如 1.3.10）、platforms 数组、updateType、releaseScope 和 userIds 数组，布尔值为 true/false。userId 格式为 appName:platform:businessId，必须匹配应用和平台。全量发布可单独配置不带 file 的目标，使用 updateType=full 和 installerSourceUrl；工具不上传 APK/EXE/DMG 安装文件。
 
 deploy 默认把不含 API Key 的状态保存到当前目录 .ota-cli/deployments/，也可通过 --state 指定新文件。文件含应用、资源/发布 ID、幂等键及阶段，使用 0600 权限；不要提交到 Git。支持单目标恢复：
 
 ~~~bash
-ota-cli release deploy --target desktop --target-version-code 110 --resume .ota-cli/deployments/DEPLOYMENT_UUID.json
+ota-cli release deploy --target desktop --target-version 1.3.10 --resume .ota-cli/deployments/DEPLOYMENT_UUID.json
 ~~~
 
 恢复时保留相同发布参数及源文件内容。草稿创建重用原幂等键，发布重用原 releaseId。上传响应丢失时没有资源查询幂等保证，工具会停止并提示结果未知，不自动重新上传；先核对服务端再决定新建执行。状态文件的 .lock 表示正在执行或上次异常退出，确认没有相关进程后才可人工移除。
@@ -147,22 +146,22 @@ const app = createAppClient({
 const update = await app.checkUpdate({
   platform: 'windows',
   architecture: 'x64',
-  nativeVersionCode: 100,
+  currentVersion: '1.3.10',
   installedReleaseSequence: 0,
   distributionChannel: 'stable'
 })
 ~~~
 
-无更新返回 null。nativeVersionCode 是原生安装基础版本，不是热更新后的展示版本；installedReleaseSequence 是实际已加载发布的序号，不是 UUID。全量使用 installerSourceUrl，热更新使用 bundleUrl。
+无更新返回 null。currentVersion 是原生安装包的显示版本字符串（如 1.3.10），热更新不能改变它；installedReleaseSequence 是实际已加载发布的序号，不是 UUID。全量使用 installerSourceUrl，热更新使用 bundleUrl。
 
-app.reportSuccess / app.reportFailure 使用 platform、versionCode、releaseSequence，可带 reportedUsername、extras 和 reportId。reportId 由业务为一次安装事件生成并保存，重试同一事件时沿用原 UUID 与相同内容；SDK 不替每次请求生成新 ID。无键上报逐次计数。只有实际重启并确认加载后才上报成功。
+app.reportSuccess / app.reportFailure 使用 platform、显示版本字符串 version、releaseSequence，可带 reportedUsername、extras 和 reportId。reportId 由业务为一次安装事件生成并保存，重试同一事件时沿用原 UUID 与相同内容；SDK 不替每次请求生成新 ID。无键上报逐次计数。只有实际重启并确认加载后才上报成功。
 
 app.reportAppError 接收 kind/message/stack；app.captureAppError(error, context) 可规范化异常。它们不携带 releaseSequence/reportId。extras 保持 JSON 类型，不转换业务键名。
 
 CLI 调试入口：
 
 ~~~bash
-ota-cli app check --app desktop --platform windows --native-version-code 100
+ota-cli app check --app desktop --platform windows --current-version 1.3.10
 ota-cli app success --app desktop --input success.json
 ota-cli app failure --app desktop --input failure.json
 ota-cli app app-error --app desktop --input app-error.json
@@ -215,7 +214,7 @@ ws.onApplicationMessage('desktop', message => {
 await ws.subscribeApp({
   appName: 'desktop',
   platform: 'windows',
-  nativeVersionCode: 100,
+  currentVersion: '1.3.10',
   installedReleaseSequence: 0
 })
 await ws.subscribeUser('desktop:windows:42')
@@ -242,3 +241,5 @@ pnpm test:verify
 ~~~
 
 测试集中在 test/。构建同时验证 ESM/CJS 导出、类型声明和配置示例；测试覆盖本机 HTTP/CLI、浏览器打包、Socket 生命周期和发布恢复。测试不访问生产库、业务服务或 OSS。真实客户端、OSS 和目标服务联调仍需单独验收。构建及验证不会发布 npm 包。
+
+热更新要求 targetVersion === currentVersion，且 releaseSequence 大于已安装序号，并匹配平台、架构、渠道及用户范围；完整更新按数字分段比较 targetVersion 与 currentVersion，目标更高的全量包优先。SDK 2.0.0 需与配套的 OTA API 和客户端同步升级。

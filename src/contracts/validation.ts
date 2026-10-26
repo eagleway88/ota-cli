@@ -1,3 +1,4 @@
+import { isAppVersion } from './version'
 import { platforms, type CheckInput, type DraftInput, type Platform } from './index'
 
 export function object(value: unknown, label = 'input'): asserts value is Record<string, unknown> {
@@ -28,14 +29,14 @@ export function checkInput(input: CheckInput, app: string) {
   object(input)
   knownKeys(input, [
     'platform',
-    'nativeVersionCode',
+    'currentVersion',
     'installedReleaseSequence',
     'architecture',
     'distributionChannel',
     'userId'
   ])
   platform(input.platform)
-  integer(input.nativeVersionCode, 'nativeVersionCode')
+  appVersion(input.currentVersion, 'currentVersion')
   if (input.installedReleaseSequence !== undefined)
     integer(input.installedReleaseSequence, 'installedReleaseSequence')
   for (const key of ['architecture', 'distributionChannel'] as const)
@@ -96,8 +97,7 @@ export function queryInput(query: object, fields: readonly string[]) {
   if (query.releaseSequence !== undefined) integer(query.releaseSequence, 'releaseSequence', 1)
 }
 export const draftKeys = [
-  'targetVersionCode',
-  'baseVersionCodes',
+  'targetVersion',
   'platforms',
   'architectures',
   'distributionChannel',
@@ -118,8 +118,7 @@ export function draftPatch(input: Partial<DraftInput>, app: string) {
   knownKeys(input, draftKeys)
   if (!Object.keys(input).length) throw new Error('Draft patch must not be empty')
   const skeleton: DraftInput = {
-    targetVersionCode: 0,
-    baseVersionCodes: [0],
+    targetVersion: '0.0.0',
     platforms: [...platforms],
     updateType: 'full',
     artifactId: 'pending-resource',
@@ -127,17 +126,12 @@ export function draftPatch(input: Partial<DraftInput>, app: string) {
     userIds: [],
     ...input
   }
-  // A partial update can rely on the current resource; validate its supplied fields locally.
-  if (input.updateType === 'hot' && input.baseVersionCodes === undefined)
-    skeleton.baseVersionCodes = [0]
   draftInput(skeleton, app)
 }
 export function draftInput(input: DraftInput, app: string) {
   object(input)
   knownKeys(input, draftKeys)
-  integer(input.targetVersionCode, 'targetVersionCode')
-  if (!Array.isArray(input.baseVersionCodes)) throw new Error('baseVersionCodes must be an array')
-  input.baseVersionCodes.forEach((value) => integer(value, 'baseVersionCodes'))
+  appVersion(input.targetVersion, 'targetVersion')
   if (!Array.isArray(input.platforms) || !input.platforms.length)
     throw new Error('platforms must be a nonempty array')
   input.platforms.forEach(platform)
@@ -146,8 +140,6 @@ export function draftInput(input: DraftInput, app: string) {
     input.architectures.forEach((value) => text(value, 'architecture', 128))
   }
   if (!['hot', 'full'].includes(input.updateType)) throw new Error('Invalid updateType')
-  if (input.updateType === 'hot' && !input.baseVersionCodes.length)
-    throw new Error('Hot updates require baseVersionCodes')
   if (!['public', 'allowlist'].includes(input.releaseScope))
     throw new Error('Explicit releaseScope is required')
   if (!Array.isArray(input.userIds) || input.userIds.length > 5000)
@@ -174,4 +166,8 @@ export function draftInput(input: DraftInput, app: string) {
     throw new Error('Hot updates require artifactId or bundleUrl')
   if (input.updateType === 'full' && !input.artifactId && !input.installerSourceUrl)
     throw new Error('Full updates require artifactId or installerSourceUrl')
+}
+
+export function appVersion(value: unknown, label: string): asserts value is string {
+  if (!isAppVersion(value)) throw new Error(label + ' must be a display version such as 1.3.10')
 }

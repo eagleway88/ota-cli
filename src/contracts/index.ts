@@ -30,7 +30,7 @@ export interface ManageOptions extends HttpOptions {
 }
 export interface CheckInput {
   platform: Platform
-  nativeVersionCode: number
+  currentVersion: string
   installedReleaseSequence?: number
   architecture?: string
   distributionChannel?: string
@@ -38,7 +38,7 @@ export interface CheckInput {
 }
 export interface ReportInput {
   platform: Platform
-  versionCode: number
+  version: string
   reportedUsername?: string | null
   extras?: JsonValue
 }
@@ -74,8 +74,7 @@ export interface AppErrorRecord extends AppErrorInput {
   lastSeenAt: string
 }
 export interface DraftInput {
-  targetVersionCode: number
-  baseVersionCodes: number[]
+  targetVersion: string
   platforms: Platform[]
   architectures?: string[]
   distributionChannel?: string

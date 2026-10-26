@@ -14,8 +14,7 @@ const config: OtaCliConfig = {
   targets: {
     desktop: {
       file: './dist/desktop-update.zip',
-      targetVersionCode: 110,
-      baseVersionCodes: [100],
+      targetVersion: '1.3.10',
       platforms: ['windows', 'macos', 'linux']
     }
   },
