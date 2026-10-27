@@ -1,34 +1,60 @@
 import type { CheckInput, JsonValue, Release, TargetedMessage } from '../contracts'
 import { appName, checkInput, knownKeys, text, userId } from '../contracts/validation'
 
-export type AppSubscription = Omit<CheckInput, 'userId'> & { appName: string }
-export interface DeviceTarget {
+/** 应用更新订阅上下文；使用真实平台和已加载发布序号，不接受 HTTP 查询的 userId。 */
+export type AppSubscription = Omit<CheckInput, 'userId'> & {
+  /** 要订阅的服务端应用标识。 */
   appName: string
+}
+/** 设备消息目标；相同 uniqueId 在不同应用中相互隔离。 */
+export interface DeviceTarget {
+  /** 设备所属应用。 */
+  appName: string
+  /** 由接入方分配的稳定设备标识。 */
   uniqueId: string
 }
+/** 底层 Socket 事件监听器；业务消息可通过上层方法获得类型。 */
 export type SocketListener = (payload?: unknown) => void
+/** SDK 使用的 Socket.IO 最小接口，便于注入适配器。 */
 export interface WsSocket {
+  /** 当前底层连接是否已建立。 */
   connected: boolean
+  /** 注册指定事件的监听器。 */
   on(event: string, handler: SocketListener): unknown
+  /** 解除指定事件的监听器。 */
   off(event: string, handler: SocketListener): unknown
+  /** 发起连接。 */
   connect(): unknown
+  /** 断开连接。 */
   disconnect(): unknown
+  /** 为随后发送并等待 ACK 的事件设置毫秒级超时。 */
   timeout(ms: number): { emitWithAck(event: string, payload: unknown): Promise<unknown> }
 }
+/** 创建底层 Socket 的工厂；可传 socket.io-client 的 io，SDK 固定使用 WebSocket。 */
 export type WsAdapter = (
   url: string,
   options: { path: string; transports: string[]; autoConnect: boolean; reconnection: boolean }
 ) => WsSocket
+/** Socket 客户端连接设置；不携带管理 API Key。 */
 export interface WsOptions {
+  /** HTTP(S) origin，例如 https://ota.example.com；不包含 /api/v1 或 Socket 路径。 */
   serverURL: string
+  /** 显式注入 Socket 工厂，例如 socket.io-client 的 io。 */
   adapter: WsAdapter
+  /** Socket.IO 路径，默认 /socket.io；反向代理前缀在这里设置。 */
   path?: string
+  /** 连接和单次 ACK 等待超时，单位毫秒，默认 10000。 */
   timeout?: number
+  /** 是否创建后立即连接，默认 true。 */
   autoConnect?: boolean
 }
+/** 业务处理完成后主动确认用户或设备消息的响应。 */
 export interface MessageAck {
+  /** 被确认的消息 ID。 */
   messageId: string
+  /** 服务端是否确认了该消息。 */
   acked: boolean
+  /** 服务端返回的客户端标识。 */
   clientId: string
 }
 type Entry = { event: string; payload: object; generation: number; ack?: unknown }

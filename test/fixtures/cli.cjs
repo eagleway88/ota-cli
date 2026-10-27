@@ -1,5 +1,12 @@
 const { execFile } = require('node:child_process')
+const { writeFile } = require('node:fs/promises')
 const path = require('node:path')
+async function writeConfig(fixture, config = {}) {
+  await writeFile(
+    path.join(fixture.directory, 'ota-cli.config.ts'),
+    'export default ' + JSON.stringify({ baseURL: fixture.baseURL, appName: 'desktop', ...config })
+  )
+}
 function cli(fixture, args, env = {}) {
   return new Promise((resolve) =>
     execFile(
@@ -19,4 +26,4 @@ function cli(fixture, args, env = {}) {
     )
   )
 }
-module.exports = { cli }
+module.exports = { cli, writeConfig }

@@ -16,29 +16,50 @@ import { createTransport, normalizeBaseURL, OtaApiError } from '../transport/htt
 import { prepareSource, type PreparedSource } from './source'
 import { fingerprint, stateSession, type DeploymentState } from './state'
 
+/** Node 发布器连接设置；API Key 应由受控环境注入。 */
 export interface PublisherOptions extends ManageOptions {
+  /** 单次 ZIP 上传超时，单位毫秒，默认 150000；普通请求使用 timeout。 */
   uploadTimeout?: number
 }
+/** Node SDK 的一个部署输入；CLI 会从配置中的目标生成此对象。 */
 export interface DeployTarget {
+  /** 资源上传、草稿和发布所属的服务端应用标识。 */
   appName: string
+  /** ZIP 或待压缩目录；Node SDK 相对执行目录解析，CLI 先按配置目录解析。 */
   file?: string
+  /** 完整发布内容；有 file 时上传后填入 artifactId，勿再指定资源或下载 URL。 */
   release: DraftInput
 }
+/** 单次部署的执行控制，与发布内容分开设置。 */
 export interface DeployOptions extends RequestControl {
+  /** 恢复状态文件；Node SDK 默认不写，CLI 默认保存到 .ota-cli/deployments/。 */
   stateFile?: string
+  /** 从 stateFile 继续执行，默认 false；需保持服务地址、应用、发布内容及文件内容一致。 */
   resume?: boolean
+  /** 发布后等待服务端分发任务成功，默认 false；不等待客户端下载安装。 */
   wait?: boolean
+  /** 任务等待总时长，单位毫秒，默认 300000；超时不会撤销已完成的发布。 */
   waitTimeout?: number
+  /** 查询任务状态的间隔，单位毫秒，默认 1000。 */
   pollInterval?: number
+  /** 远端发布成功后调用；回调失败会加入结果 warnings。 */
   onPublished?: (result: PublishResult) => void | Promise<void>
+  /** 部署失败后调用；回调异常不会覆盖原始错误。 */
   onError?: (error: unknown) => void | Promise<void>
 }
+/** 部署结果；published 表示远端发布已提交，客户端加载情况需另查上报。 */
 export interface DeploymentResult extends PublishResult {
+  /** 本次发布所属应用。 */
   appName: string
+  /** 本次部署的 UUID；恢复执行会沿用保存的部署标识。 */
   deploymentId: string
+  /** 通过本次文件上传或恢复状态取得的资源 ID；使用已有 URL 时可能没有。 */
   artifactId?: string
+  /** 实际使用的恢复状态文件路径；未设置状态文件时省略。 */
   stateFile?: string
+  /** 非致命警告，例如发布成功后的回调失败。 */
   warnings: string[]
+  /** wait=true 且任务等待成功时返回的任务详情。 */
   task?: TaskDetail
 }
 export class DeploymentError extends Error {

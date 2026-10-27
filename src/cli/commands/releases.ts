@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Command } from 'commander'
-import type { DraftInput } from '../../contracts'
-import { draftInput, object } from '../../contracts/validation'
+import type { DraftInput, Platform } from '../../contracts'
+import { draftInput, object, platform } from '../../contracts/validation'
 import { createPublisher } from '../../node/publisher'
 import { context, jsonFile, numberOption, type CliContext } from '../context'
 import { result, errorResult, progress, withHookOutput } from '../output'
@@ -12,23 +12,12 @@ function action(command: Command, handler: (ctx: CliContext) => Promise<unknown>
   command.action(async (_options, cmd: Command) => result(await handler(await context(cmd))))
   return command
 }
-function target(ctx: CliContext, name: string) {
+function target(ctx: CliContext, name: Platform) {
   const configured = ctx.config.targets?.[name]
   if (!configured) throw new Error('Unknown release target: ' + name)
   const { file, appName: targetApp, ...release } = configured
-  const merged = { ...ctx.config.defaults, ...release } as DraftInput
-  if (ctx.args.targetVersion !== undefined) merged.targetVersion = String(ctx.args.targetVersion)
-  if (ctx.args.updateType !== undefined)
-    merged.updateType = String(ctx.args.updateType) as DraftInput['updateType']
-  if (ctx.args.releaseNotes !== undefined) merged.releaseNotes = String(ctx.args.releaseNotes)
-  if (ctx.args.installerSourceUrl !== undefined)
-    merged.installerSourceUrl = String(ctx.args.installerSourceUrl)
-  const filePath =
-    ctx.args.file !== undefined
-      ? path.resolve(String(ctx.args.file))
-      : file
-        ? path.resolve(ctx.directory, file)
-        : undefined
+  const merged = { ...ctx.config.defaults, ...release, platforms: [name] } as DraftInput
+  const filePath = file ? path.resolve(ctx.directory, file) : undefined
   return { appName: ctx.resolveApp(targetApp), file: filePath, release: merged }
 }
 export function registerReleases(program: Command) {
@@ -151,12 +140,10 @@ export function registerReleases(program: Command) {
   action(
     release
       .command('deploy')
-      .requiredOption('--target <name[,name]>')
-      .option('--target-version <version>')
-      .option('--update-type <hot|full>')
-      .option('--release-notes <text>')
-      .option('--installer-source-url <url>')
-      .option('--file <path>')
+      .option(
+        '--target <platform[,platform]>',
+        'Select configured platforms (default: all targets)'
+      )
       .option('--dry-run')
       .option('--state <path>')
       .option('--resume <stateFile>')
@@ -164,11 +151,19 @@ export function registerReleases(program: Command) {
       .option('--wait-timeout <ms>')
       .option('--poll-interval <ms>'),
     async (ctx) => {
-      const names = String(ctx.args.target).split(',')
+      const selected =
+        ctx.args.target === undefined
+          ? Object.keys(ctx.config.targets ?? {})
+          : String(ctx.args.target).split(',')
+      if (!selected.length) throw new Error('No release targets configured in ota-cli.config')
+      const names = selected.map((name) => {
+        platform(name)
+        return name
+      })
       if (names.some((name) => !name) || new Set(names).size !== names.length)
         throw new Error('Choose distinct target names')
-      if (names.length > 1 && (ctx.args.state || ctx.args.resume || ctx.args.file))
-        throw new Error('--state, --resume and --file require exactly one target')
+      if (names.length > 1 && (ctx.args.state || ctx.args.resume))
+        throw new Error('--state and --resume require exactly one target')
       const targets = names.map((name) => target(ctx, name))
       if (ctx.args.state && ctx.args.resume) throw new Error('Choose --state or --resume')
       if (ctx.args.dryRun) {

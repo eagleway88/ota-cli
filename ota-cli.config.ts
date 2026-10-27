@@ -5,6 +5,7 @@ const config: OtaCliConfig = {
   appName: 'app-demo',
   accessKeyEnv: 'OTA_ACCESS_KEY',
   defaults: {
+    targetVersion: '1.3.10',
     updateType: 'hot',
     releaseScope: 'public',
     userIds: [],
@@ -12,10 +13,14 @@ const config: OtaCliConfig = {
     showUpdateDialog: true
   },
   targets: {
-    desktop: {
-      file: './dist/desktop-update.zip',
-      targetVersion: '1.3.10',
-      platforms: ['windows', 'macos', 'linux']
+    windows: {
+      file: './dist/desktop-update.zip'
+    },
+    macos: {
+      file: './dist/desktop-update.zip'
+    },
+    linux: {
+      file: './dist/desktop-update.zip'
     }
   },
   onPublished(result) {

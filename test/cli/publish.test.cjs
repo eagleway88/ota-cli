@@ -3,20 +3,16 @@ const assert = require('node:assert/strict')
 const { writeFile, access } = require('node:fs/promises')
 const path = require('node:path')
 const { fixture } = require('../fixtures/api.cjs')
-const { cli } = require('../fixtures/cli.cjs')
+const { cli, writeConfig } = require('../fixtures/cli.cjs')
 const release = {
   targetVersion: '1.3.10',
-  platforms: ['windows', 'macos', 'linux'],
   updateType: 'hot',
   releaseScope: 'public',
   userIds: [],
   mandatory: false
 }
-async function config(f, targets = { desktop: { file: f.zip, ...release } }) {
-  await writeFile(
-    path.join(f.directory, 'ota-cli.config.ts'),
-    'export default ' + JSON.stringify({ baseURL: f.baseURL, appName: 'desktop', targets })
-  )
+async function config(f, targets = { windows: { file: f.zip, ...release } }) {
+  await writeConfig(f, { targets })
 }
 test('CLI package version comes from the manifest', async (t) => {
   const f = await fixture(t)
@@ -24,7 +20,7 @@ test('CLI package version comes from the manifest', async (t) => {
   assert.equal(output.code, 0)
   assert.equal(output.stdout.trim(), require('../../package.json').version)
 })
-test('real CLI deploy publishes one desktop ZIP for three platforms and keeps hook logs off stdout', async (t) => {
+test('CLI deploy defaults to all configured platforms and uploads their shared ZIP once', async (t) => {
   const f = await fixture(t)
   await writeFile(
     path.join(f.directory, 'ota-cli.config.ts'),
@@ -32,53 +28,96 @@ test('real CLI deploy publishes one desktop ZIP for three platforms and keeps ho
       JSON.stringify({
         baseURL: f.baseURL,
         appName: 'desktop',
-        targets: { desktop: { file: f.zip, ...release } }
+        defaults: release,
+        targets: {
+          windows: { file: f.zip },
+          macos: { file: f.zip },
+          linux: { file: f.zip }
+        }
       }) +
       ', onPublished() { console.log("hook diagnostic") } }'
   )
-  const output = await cli(f, ['release', 'deploy', '--target', 'desktop', '--json'])
+  const output = await cli(f, ['release', 'deploy', '--json'])
   assert.equal(output.code, 0, output.stderr)
-  assert.equal(JSON.parse(output.stdout).deployments[0].result.status, 'published')
+  const { deployments } = JSON.parse(output.stdout)
+  assert.deepEqual(
+    deployments.map((item) => item.target),
+    ['windows', 'macos', 'linux']
+  )
+  assert.ok(deployments.every((item) => item.result.status === 'published'))
+  assert.equal(new Set(deployments.map((item) => item.result.artifactId)).size, 1)
   assert.match(output.stderr, /hook diagnostic/)
   assert.equal(f.calls.filter((call) => call.path.endsWith('/artifacts')).length, 1)
-  assert.equal(f.drafts.size, 1)
-  assert.deepEqual([...f.drafts.values()][0].platforms, ['windows', 'macos', 'linux'])
+  assert.equal(f.drafts.size, 3)
+  assert.equal(f.publications.size, 3)
+  assert.deepEqual(
+    [...f.drafts.values()].map((draft) => draft.platforms),
+    [['windows'], ['macos'], ['linux']]
+  )
   assert.ok(!output.stdout.includes(f.accessKey))
   assert.ok(!output.stderr.includes(f.accessKey))
 })
-test('real CLI policies share an artifact and dry-run never writes remotely or requires a key', async (t) => {
+test('CLI deploy selects only requested platforms and dry-run never writes remotely or requires a key', async (t) => {
   const f = await fixture(t)
   await config(f, {
-    stable: { file: f.zip, ...release },
-    beta: { file: f.zip, ...release, distributionChannel: 'beta' }
+    windows: { file: f.zip, ...release },
+    macos: { file: f.zip, ...release, distributionChannel: 'beta' },
+    linux: { file: './not-built.zip', ...release }
   })
-  const dryRun = await cli(f, ['release', 'deploy', '--target', 'stable,beta', '--dry-run'], {
+  const dryRun = await cli(f, ['release', 'deploy', '--target', 'windows,macos', '--dry-run'], {
     OTA_ACCESS_KEY: ''
   })
   assert.equal(dryRun.code, 0, dryRun.stderr)
   assert.equal(JSON.parse(dryRun.stdout).dryRun, true)
+  assert.deepEqual(
+    JSON.parse(dryRun.stdout).targets.map((target) => target.release.platforms),
+    [['windows'], ['macos']]
+  )
   assert.equal(f.calls.length, 0)
   await assert.rejects(access(path.join(f.directory, '.ota-cli')))
-  const output = await cli(f, ['release', 'deploy', '--target', 'stable,beta'])
+  const output = await cli(f, ['release', 'deploy', '--target', 'windows,macos'])
   assert.equal(output.code, 0, output.stderr)
   assert.equal(JSON.parse(output.stdout).deployments.length, 2)
   assert.equal(f.calls.filter((call) => call.path.endsWith('/artifacts')).length, 1)
   assert.equal(f.publications.size, 2)
 })
+test('a single implicit platform can save state and explicit selection can resume it without republishing', async (t) => {
+  const f = await fixture(t)
+  await config(f)
+  const stateFile = path.join(f.directory, 'deployment.json')
+  const first = await cli(f, ['release', 'deploy', '--state', stateFile])
+  assert.equal(first.code, 0, first.stderr)
+  assert.equal(JSON.parse(first.stdout).deployments[0].target, 'windows')
+  assert.equal(f.publications.size, 1)
+  const calls = f.calls.length
+  await config(f, {
+    windows: { file: f.zip, ...release },
+    macos: { file: f.zip, ...release }
+  })
+  const resumed = await cli(f, ['release', 'deploy', '--target', 'windows', '--resume', stateFile])
+  assert.equal(resumed.code, 0, resumed.stderr)
+  assert.equal(JSON.parse(resumed.stdout).deployments[0].result.status, 'published')
+  assert.equal(f.publications.size, 1)
+  assert.equal(f.calls.length, calls)
+})
+
 test('resource upload and draft creation never publish implicitly', async (t) => {
   const f = await fixture(t)
-  const base = ['--no-config', '--base-url', f.baseURL, '--app', 'desktop']
-  const uploaded = await cli(f, [...base, 'artifact', 'upload', '--file', f.zip])
+  await writeConfig(f)
+  const uploaded = await cli(f, ['artifact', 'upload', '--file', f.zip])
   assert.equal(uploaded.code, 0, uploaded.stderr)
   assert.equal(f.drafts.size, 0)
   assert.equal(f.publications.size, 0)
   const input = path.join(f.directory, 'release.json')
   await writeFile(
     input,
-    JSON.stringify({ ...release, artifactId: JSON.parse(uploaded.stdout).artifactId })
+    JSON.stringify({
+      ...release,
+      platforms: ['windows'],
+      artifactId: JSON.parse(uploaded.stdout).artifactId
+    })
   )
   const created = await cli(f, [
-    ...base,
     'release',
     'create',
     '--input',
@@ -99,15 +138,8 @@ test('CLI makes one request on 401/403, gives distinct hints and never prints cr
         return true
       }
     })
-    const output = await cli(f, [
-      '--no-config',
-      '--base-url',
-      f.baseURL,
-      '--app',
-      'desktop',
-      'release',
-      'list'
-    ])
+    await writeConfig(f)
+    const output = await cli(f, ['release', 'list'])
     assert.equal(output.code, 1)
     const error = JSON.parse(output.stderr)
     assert.equal(error.status, status)

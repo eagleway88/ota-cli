@@ -3,6 +3,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Artifact, DraftInput, PublishResult } from '../contracts'
 
+/** 部署已记录的阶段；uploading 且无资源元数据表示上传结果未知。 */
 export type DeploymentPhase =
   | 'prepared'
   | 'uploading'
@@ -11,17 +12,29 @@ export type DeploymentPhase =
   | 'draft'
   | 'publishing'
   | 'published'
+/** 可恢复的部署状态；不包含 API Key，恢复时会校验输入指纹。 */
 export interface DeploymentState {
+  /** 状态文件格式版本。 */
   version: 1
+  /** 首次部署生成的 UUID。 */
   deploymentId: string
+  /** 标准化后的 API 根地址，用于防止恢复到其他服务。 */
   baseURL: string
+  /** 原部署所属应用。 */
   appName: string
+  /** 应用、发布字段及源 ZIP 内容的指纹；不是客户端版本号。 */
   intentHash: string
+  /** 首次部署开始时间。 */
   startedAt: string
+  /** 最近一次保存的部署阶段。 */
   phase: DeploymentPhase
+  /** 草稿创建使用的幂等键；恢复时沿用，避免重复创建草稿。 */
   idempotencyKey: string
+  /** 已确认上传成功的资源元数据。 */
   artifact?: Artifact
+  /** 已创建的草稿或发布 ID；恢复发布时复用。 */
   releaseId?: string
+  /** 已确认提交成功的发布结果。 */
   publication?: PublishResult
 }
 export function fingerprint(

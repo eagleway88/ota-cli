@@ -6,7 +6,9 @@
 - manage/: application-bound backend operations.
 - node/: directory packing, SHA-256 resource reuse, per-stage publication state and bounded task waiting.
 - ws/: explicit adapter, desired subscription state, reconnection and application-isolated messaging.
-- cli/: configuration/profile resolution, commands and redacted JSON/diagnostic output.
+- cli/: ota-cli.config discovery, commands and redacted JSON/diagnostic output. Connection and deployment settings come only from the config file; CLI flags select operations, targets and query filters.
+
+CLI targets are keyed only by known platforms. Each selected key becomes one release with a single inferred platform. Omitting --target selects every configured target; an explicit list selects a subset. All selected targets share one Publisher instance so identical ZIPs in the same application reuse an upload. Direct SDK inputs still accept multi-platform releases.
 
 One npm package exposes separate App / Manage / Node / Socket entry points. Node and CLI imports do not enter the App/Socket bundles. The CLI calls SDK operations instead of defining a second protocol.
 
