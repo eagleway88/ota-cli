@@ -7,11 +7,20 @@ async function writeConfig(fixture, config = {}) {
     'export default ' + JSON.stringify({ baseURL: fixture.baseURL, appName: 'desktop', ...config })
   )
 }
-function cli(fixture, args, env = {}) {
+function cli(fixture, args, env = {}, { tty = false } = {}) {
   return new Promise((resolve) =>
     execFile(
       process.execPath,
-      [path.resolve(__dirname, '../../dist/cli.cjs'), ...args],
+      [
+        ...(tty
+          ? [
+              '-e',
+              "Object.defineProperty(process.stderr, 'isTTY', { value: true }); process.stderr.columns = 100; require(process.argv[1])"
+            ]
+          : []),
+        path.resolve(__dirname, '../../dist/cli.cjs'),
+        ...args
+      ],
       {
         cwd: fixture.directory,
         timeout: 15000,

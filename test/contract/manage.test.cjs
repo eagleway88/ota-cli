@@ -3,20 +3,15 @@ const assert = require('node:assert/strict')
 const { createManageClient } = require('../../dist/manage.cjs')
 const { createAppClient } = require('../../dist/index.cjs')
 const { accessKey } = require('../fixtures/api.cjs')
+const { capture, response } = require('../fixtures/http.cjs')
 function client() {
   const calls = []
   const manage = createManageClient({
     baseURL: 'https://example.test/api/v1',
     accessKey,
-    adapter: async (config) => {
-      calls.push(config)
-      return {
-        config,
-        headers: {},
-        status: 200,
-        statusText: 'OK',
-        data: { code: 0, data: { data: [], total: 0, retention: 'permanent' } }
-      }
+    fetch: async (url, init) => {
+      calls.push(capture(url, init))
+      return response({ code: 0, data: { data: [], total: 0, retention: 'permanent' } })
     }
   })
   return { app: manage.forApp('desktop'), calls }
@@ -39,8 +34,8 @@ test('every management read uses GET, correct scoped paths and preserves paginat
   for (const [request, suffix] of routes) {
     const response = await request()
     assert.equal(response.retention, 'permanent')
-    assert.equal(calls.at(-1).method, 'get')
-    assert.equal(calls.at(-1).url, 'manage/apps/desktop' + suffix)
+    assert.equal(calls.at(-1).method, 'GET')
+    assert.equal(new URL(calls.at(-1).url).pathname, '/api/v1/manage/apps/desktop' + suffix)
   }
 })
 test('writes use formal JSON and revision checks, with no global message or administration route', async () => {
@@ -54,15 +49,17 @@ test('writes use formal JSON and revision checks, with no global message or admi
   await app.messages.application(false)
   await app.messages.user('desktop:windows:42', { data: { nested: [null, 1] } })
   await app.messages.device('device-1', { resend: true })
-  assert.equal(calls[0].method, 'patch')
-  assert.deepEqual(JSON.parse(calls[1].data), {
+  assert.equal(calls[0].method, 'PATCH')
+  assert.deepEqual(JSON.parse(calls[1].body), {
     userIds: ['desktop:windows:42'],
     expectedRevision: 2
   })
-  assert.deepEqual(JSON.parse(calls[2].data), { releaseScope: 'allowlist', expectedRevision: 3 })
-  assert.deepEqual(JSON.parse(calls[6].data), { data: false })
-  assert.deepEqual(JSON.parse(calls[8].data), { uniqueId: 'device-1', resend: true })
-  assert.ok(calls.every((call) => call.url.startsWith('manage/apps/desktop/')))
+  assert.deepEqual(JSON.parse(calls[2].body), { releaseScope: 'allowlist', expectedRevision: 3 })
+  assert.deepEqual(JSON.parse(calls[6].body), { data: false })
+  assert.deepEqual(JSON.parse(calls[8].body), { uniqueId: 'device-1', resend: true })
+  assert.ok(
+    calls.every((call) => new URL(call.url).pathname.startsWith('/api/v1/manage/apps/desktop/'))
+  )
 })
 test('invalid filters, partial fields and JSON are rejected before HTTP', () => {
   const { app, calls } = client()

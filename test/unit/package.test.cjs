@@ -40,3 +40,15 @@ test('App and Socket SDKs bundle for browsers without Node or CLI modules', asyn
     )
   }
 })
+
+test('HTTP entries and published declarations have no Axios runtime or type dependency', async () => {
+  const { readdirSync, readFileSync } = require('node:fs')
+  const { join } = require('node:path')
+  const pkg = require('../../package.json')
+  assert.equal(pkg.dependencies?.axios, undefined)
+  assert.equal(pkg.peerDependencies?.axios, undefined)
+  assert.equal(pkg.devDependencies?.axios, undefined)
+  assert.doesNotMatch(readFileSync('pnpm-lock.yaml', 'utf8'), /^\s+axios(?:@|:)/m)
+  for (const file of readdirSync('dist').filter((name) => /\.(?:js|cjs|ts|cts)$/.test(name)))
+    assert.doesNotMatch(readFileSync(join('dist', file), 'utf8'), /axios/i, file)
+})

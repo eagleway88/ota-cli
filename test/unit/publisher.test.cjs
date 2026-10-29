@@ -29,7 +29,8 @@ test('one shared desktop archive is uploaded once and published once for three p
   assert.ok(!stored.includes(f.accessKey))
   assert.ok(!stored.includes('s'.repeat(43)))
   assert.equal(JSON.parse(stored).phase, 'published')
-  assert.equal((await stat(stateFile)).mode & 0o777, 0o600)
+  // Windows does not expose POSIX permission bits through chmod/stat.
+  if (process.platform !== 'win32') assert.equal((await stat(stateFile)).mode & 0o777, 0o600)
 })
 test('same-app policies and identical ZIPs at different paths reuse a single artifact; apps remain isolated', async (t) => {
   const f = await fixture(t),
@@ -74,7 +75,11 @@ test('symlinks in an upload directory are rejected before any HTTP request', asy
   t.after(() => publisher.close())
   const dir = path.join(f.directory, 'unsafe')
   await mkdir(dir)
-  await symlink(f.zip, path.join(dir, 'outside.zip'))
+  if (process.platform === 'win32') {
+    const outside = path.join(f.directory, 'outside')
+    await mkdir(outside)
+    await symlink(outside, path.join(dir, 'outside'), 'junction')
+  } else await symlink(f.zip, path.join(dir, 'outside.zip'))
   await assert.rejects(publisher.uploadArtifact('desktop', dir), /Symbolic/)
   assert.equal(f.calls.length, 0)
 })
@@ -102,7 +107,10 @@ test('an unknown upload outcome is not silently replayed', async (t) => {
     publisher = createPublisher(options(f))
   t.after(() => publisher.close())
   const stateFile = path.join(f.directory, 'unknown.json')
-  await assert.rejects(publisher.deploy(target(f), { stateFile }), /socket hang up/)
+  await assert.rejects(
+    publisher.deploy(target(f), { stateFile }),
+    (error) => error.apiError?.kind === 'network'
+  )
   await assert.rejects(
     publisher.deploy(target(f), { stateFile, resume: true }),
     /Upload outcome unknown/

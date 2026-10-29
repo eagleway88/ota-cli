@@ -1,13 +1,26 @@
 import { format } from 'node:util'
-import { redact } from '../context'
+import { redact } from './redact'
+import type { ProgressDisplay } from './progress'
 import { DeploymentError } from '../../node/publisher'
 import { OtaApiError } from '../../transport/http'
 
+let display: ProgressDisplay | undefined
+export async function withProgress<T>(progress: ProgressDisplay, handler: () => Promise<T>) {
+  const previous = display
+  display = progress
+  try {
+    return await handler()
+  } finally {
+    progress.close()
+    display = previous
+  }
+}
 export function result(value: unknown) {
   process.stdout.write(redact(JSON.stringify(value, null, 2)) + '\n')
 }
 export function progress(message: string) {
-  process.stderr.write(redact(message) + '\n')
+  if (display) display.log(message)
+  else process.stderr.write(redact(message) + '\n')
 }
 export function errorResult(error: unknown) {
   const record: Record<string, unknown> = {

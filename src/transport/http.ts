@@ -1,5 +1,7 @@
-import axios, { type AxiosRequestConfig } from 'axios'
 import type { HttpOptions, RequestControl } from '../contracts'
+import { emit } from './events'
+
+let requestSequence = 0
 
 const errorBrand = Symbol.for('@eagleway/ota-cli/OtaApiError')
 export class OtaApiError extends Error {
@@ -55,23 +57,8 @@ export function createTransport(options: HttpOptions, accessKey?: string) {
   if (accessKey !== undefined) validateAccessKey(accessKey)
   if (accessKey === undefined && 'accessKey' in options)
     throw new Error('App API must not receive an accessKey')
-  const client = axios.create({
-    baseURL: baseURL + '/',
-    timeout: options.timeout ?? 15000,
-    headers: options.headers,
-    adapter: options.adapter,
-    maxRedirects: 0,
-    withCredentials: false
-  })
-  client.interceptors.request.use((config) => {
-    config.auth = undefined
-    // Do not inherit credentials from the consumer's global axios defaults.
-    config.headers.delete('Authorization')
-    config.headers.delete('Cookie')
-    config.headers.delete('Proxy-Authorization')
-    if (accessKey !== undefined) config.headers.set('Authorization', 'Bearer ' + accessKey)
-    return config
-  })
+  const fetchRequest = options.fetch ?? globalThis.fetch
+  if (typeof fetchRequest !== 'function') throw new Error('This runtime must provide fetch')
   const sanitize = (value: string) => {
     if (!accessKey) return value
     return value
@@ -86,19 +73,66 @@ export function createTransport(options: HttpOptions, accessKey?: string) {
     data?: unknown,
     query?: object,
     control: RequestControl = {},
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    body?: ReadableStream<Uint8Array>
   ): Promise<T> {
+    const id = ++requestSequence
+    const started = Date.now()
+    const controller = new AbortController()
+    const aborted = () => controller.abort(control.signal?.reason)
+    control.signal?.addEventListener('abort', aborted, { once: true })
+    if (control.signal?.aborted) aborted()
+    const timer = setTimeout(
+      () => controller.abort(new Error('Request timed out')),
+      options.timeout ?? 15000
+    )
+    const observe = (phase: 'start' | 'success' | 'error') =>
+      emit(options.onRequest, { id, method, path, phase, elapsedMs: Date.now() - started })
+    let response: Response | undefined
+    observe('start')
     try {
-      const config: AxiosRequestConfig = {
+      const url = new URL(baseURL + '/' + path)
+      for (const [key, value] of Object.entries(query ?? {}))
+        if (value !== undefined && value !== null) url.searchParams.set(key, String(value))
+      const requestHeaders = new Headers(options.headers)
+      for (const [key, value] of Object.entries(headers ?? {})) requestHeaders.set(key, value)
+      for (const key of ['authorization', 'cookie', 'proxy-authorization'])
+        requestHeaders.delete(key)
+      if (accessKey !== undefined) requestHeaders.set('authorization', 'Bearer ' + accessKey)
+      if (control.requestId) requestHeaders.set('x-request-id', control.requestId)
+      if (data !== undefined) requestHeaders.set('content-type', 'application/json')
+      const init: RequestInit & { duplex?: 'half' } = {
         method,
-        url: path,
-        data,
-        params: query,
-        signal: control.signal,
-        headers: { ...headers, ...(control.requestId ? { 'x-request-id': control.requestId } : {}) }
+        headers: requestHeaders,
+        body: body ?? (data !== undefined ? JSON.stringify(data) : undefined),
+        signal: controller.signal,
+        redirect: 'manual',
+        credentials: 'omit',
+        ...(body ? { duplex: 'half' } : {})
       }
-      const response = await client.request<unknown>(config)
-      const payload = response.data
+      response = await fetchRequest(url, init)
+      const requestId = response.headers.get('x-request-id') ?? undefined
+      const text = await response.text()
+      let payload: unknown
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        if (response.ok)
+          throw new OtaApiError('Invalid API envelope', -1, response.status, requestId, 'protocol')
+      }
+      if (!response.ok) {
+        const error = payload as { code?: unknown; message?: unknown } | undefined
+        throw new OtaApiError(
+          sanitize(
+            typeof error?.message === 'string'
+              ? error.message
+              : 'HTTP request failed: ' + response.status
+          ),
+          typeof error?.code === 'number' ? error.code : -1,
+          response.status,
+          requestId
+        )
+      }
       if (
         !payload ||
         typeof payload !== 'object' ||
@@ -106,40 +140,31 @@ export function createTransport(options: HttpOptions, accessKey?: string) {
         !('data' in payload) ||
         typeof payload.code !== 'number'
       )
-        throw new OtaApiError(
-          'Invalid API envelope',
-          -1,
-          response.status,
-          response.headers['x-request-id'] as string | undefined,
-          'protocol'
-        )
+        throw new OtaApiError('Invalid API envelope', -1, response.status, requestId, 'protocol')
       if (payload.code !== 0)
-        throw new OtaApiError(
-          'Request failed',
-          payload.code,
-          response.status,
-          response.headers['x-request-id'] as string | undefined
-        )
+        throw new OtaApiError('Request failed', payload.code, response.status, requestId)
+      observe('success')
       return payload.data as T
     } catch (error) {
+      observe('error')
       if (error instanceof OtaApiError) throw error
-      if (axios.isAxiosError(error)) {
-        const payload = error.response?.data as { code?: unknown; message?: unknown } | undefined
-        throw new OtaApiError(
-          sanitize(typeof payload?.message === 'string' ? payload.message : error.message),
-          typeof payload?.code === 'number' ? payload.code : -1,
-          error.response?.status,
-          error.response?.headers['x-request-id'] as string | undefined,
-          error.response ? 'api' : 'network'
-        )
-      }
+      const reason: unknown = controller.signal.aborted ? controller.signal.reason : error
       throw new OtaApiError(
-        sanitize(error instanceof Error ? error.message : 'Request failed'),
+        sanitize(
+          reason instanceof Error
+            ? reason.message
+            : controller.signal.aborted
+              ? 'Request aborted'
+              : 'Request failed'
+        ),
         -1,
-        undefined,
-        undefined,
+        response?.status,
+        response?.headers.get('x-request-id') ?? undefined,
         'network'
       )
+    } finally {
+      clearTimeout(timer)
+      control.signal?.removeEventListener('abort', aborted)
     }
   }
 }

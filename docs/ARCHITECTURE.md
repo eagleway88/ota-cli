@@ -1,10 +1,10 @@
 # Architecture
 
 - contracts/: public protocol types and local structural validation.
-- transport/: canonical API URL, API Key handling, error normalization and request metadata; no automatic write retries.
+- transport/: native Fetch, canonical API URL, API Key handling, error normalization, full-request deadlines and optional request lifecycle events; no automatic write retries.
 - app/: public client checks/reports; no credentials or management operations.
 - manage/: application-bound backend operations.
-- node/: directory packing, SHA-256 resource reuse, per-stage publication state and bounded task waiting.
+- node/: directory packing, SHA-256 resource reuse, streaming multipart uploads with byte events, per-stage publication state and bounded task waiting. form-data encodes multipart bodies; Fetch sends a counted, backpressured request stream.
 - ws/: explicit adapter, desired subscription state, reconnection and application-isolated messaging.
 - cli/: ota-cli.config discovery, commands and redacted JSON/diagnostic output. Connection and deployment settings come only from the config file; CLI flags select operations, targets and query filters.
 

@@ -1,5 +1,3 @@
-import type { AxiosAdapter } from 'axios'
-
 /** 协议支持的平台名称；Windows/macOS 等系统名称需转换为这里的小写值。 */
 export const platforms = ['ios', 'android', 'windows', 'linux', 'macos'] as const
 /** 客户端真实运行平台；发布目标名称与此类型无关。 */
@@ -16,6 +14,14 @@ export type JsonValue =
   | string
   | JsonValue[]
   | { [key: string]: JsonValue }
+/** 请求生命周期；不包含请求头、正文或查询参数。 */
+export interface RequestEvent {
+  id: number
+  method: string
+  path: string
+  phase: 'start' | 'success' | 'error'
+  elapsedMs: number
+}
 /** 各 HTTP SDK 共用的连接设置；SDK 不自动读取 ota-cli.config。 */
 export interface HttpOptions {
   /** 完整 API 根地址，例如 https://ota.example.com/api/v1；必须包含 /api/v1。 */
@@ -24,8 +30,10 @@ export interface HttpOptions {
   timeout?: number
   /** 附加请求头；禁止覆盖 Authorization、Cookie 和 Proxy-Authorization。 */
   headers?: Record<string, string>
-  /** 可选 Axios 适配器，供自定义传输或测试注入。 */
-  adapter?: AxiosAdapter
+  /** 可选 Fetch 实现，默认使用运行环境的原生 fetch。 */
+  fetch?: typeof globalThis.fetch
+  /** 可选请求观察器；观察器异常不会改变请求结果。 */
+  onRequest?: (event: RequestEvent) => void
 }
 /** 单次请求控制；中止等待或请求不会撤销服务端已提交的操作。 */
 export interface RequestControl {

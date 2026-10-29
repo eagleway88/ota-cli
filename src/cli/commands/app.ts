@@ -2,14 +2,16 @@ import { Command } from 'commander'
 import { createAppClient } from '../../app'
 import type { AppErrorInput, FailureInput, Platform, SuccessInput } from '../../contracts'
 import { object } from '../../contracts/validation'
-import { context, jsonFile, numberOption, type CliContext } from '../context'
-import { result } from '../output'
+import { jsonFile, numberOption, type CliContext } from '../context'
+import { action } from '../action'
 
 function client(ctx: CliContext) {
-  return createAppClient({ baseURL: ctx.baseURL, appName: ctx.resolveApp(), timeout: ctx.timeout })
-}
-function action(command: Command, handler: (ctx: CliContext) => Promise<unknown>) {
-  command.action(async (_options, cmd: Command) => result(await handler(await context(cmd))))
+  return createAppClient({
+    baseURL: ctx.baseURL,
+    appName: ctx.resolveApp(),
+    timeout: ctx.timeout,
+    onRequest: ctx.progress.onRequest
+  })
 }
 export function registerApp(program: Command) {
   const app = program.command('app').description('Public client checks and reports; no API Key')

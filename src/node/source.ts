@@ -11,13 +11,17 @@ export interface PreparedSource {
   sizeBytes: number
   cleanup(): Promise<void>
 }
-export async function prepareSource(input: string): Promise<PreparedSource> {
+export async function prepareSource(
+  input: string,
+  onPhase?: (phase: 'packing' | 'hashing') => void
+): Promise<PreparedSource> {
   const resolved = await realpath(input)
   const info = await stat(resolved)
   let directory: string | undefined
   let filePath = resolved
   try {
     if (info.isDirectory()) {
+      onPhase?.('packing')
       directory = await mkdtemp(path.join(tmpdir(), 'ota-cli-'))
       filePath = path.join(directory, 'bundle.zip')
       const entries: string[] = []
@@ -56,6 +60,7 @@ export async function prepareSource(input: string): Promise<PreparedSource> {
       })
     } else if (!info.isFile() || path.extname(resolved).toLowerCase() !== '.zip')
       throw new Error('Upload source must be a ZIP file or a directory')
+    onPhase?.('hashing')
     const hash = createHash('sha256')
     let sizeBytes = 0
     for await (const chunk of createReadStream(filePath)) {

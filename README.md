@@ -48,18 +48,18 @@ OTA API v1 的命令行工具与 TypeScript SDK，用于发布热更新、客户
 
 | 操作 | npm | Yarn | pnpm |
 | --- | --- | --- | --- |
-| 安装依赖 | `npm install @eagleway/ota-cli axios` | `yarn add @eagleway/ota-cli axios` | `pnpm add @eagleway/ota-cli axios` |
+| 安装依赖 | `npm install @eagleway/ota-cli` | `yarn add @eagleway/ota-cli` | `pnpm add @eagleway/ota-cli` |
 | 查看 CLI 版本 | `npm exec -- ota-cli --version` | `yarn run ota-cli --version` | `pnpm exec ota-cli --version` |
 | 构建业务资源 | `npm run build` | `yarn run build` | `pnpm build` |
 | 试运行全部已配置平台 | `npm exec -- ota-cli release deploy --dry-run` | `yarn run ota-cli release deploy --dry-run` | `pnpm exec ota-cli release deploy --dry-run` |
 | 发布全部已配置平台 | `npm exec -- ota-cli release deploy --wait` | `yarn run ota-cli release deploy --wait` | `pnpm exec ota-cli release deploy --wait` |
 | 只发布 Windows | `npm exec -- ota-cli release deploy --target windows --wait` | `yarn run ota-cli release deploy --target windows --wait` | `pnpm exec ota-cli release deploy --target windows --wait` |
 
-`axios` 是必需的 peer dependency。CLI 和 Node 上传工具要求 Node.js >= 18。
+HTTP 请求使用运行环境的原生 `fetch`，无需额外安装 HTTP 库。CLI 和 Node 上传工具要求 Node.js >= 18；客户端环境需提供 Fetch API。
 
 后文以 `pnpm exec ota-cli` 展示完整流程。npm 用户将此前缀替换为 `npm exec -- ota-cli`，Yarn 用户替换为 `yarn run ota-cli`，后面的子命令和参数相同。npm 的 `--` 用于把后续参数交给 CLI；Yarn 的 `run` 可执行已安装依赖提供的命令，参见 [npm exec](https://docs.npmjs.com/cli/commands/npm-exec/) 和 [Yarn run](https://yarnpkg.com/cli/run)。
 
-使用全局命令时可先执行 `npm install -g @eagleway/ota-cli axios`，之后直接运行 `ota-cli release deploy`。本地安装更便于让项目与 CI 使用同一依赖版本。
+使用全局命令时可先执行 `npm install -g @eagleway/ota-cli`，之后直接运行 `ota-cli release deploy`。本地安装更便于让项目与 CI 使用同一依赖版本。
 
 ### 3. 接入客户端更新检查
 
@@ -390,12 +390,17 @@ CLI 只在**当前执行目录**中按 `ota-cli.config.ts`、`.js`、`.mjs`、`.
 | `--state PATH` | 为单个目标指定新的状态文件；该文件不能已经存在 |
 | `--resume PATH` | 从单个目标的已有状态文件继续执行 |
 | `--json` | 显式声明机器调用；成功结果本身始终是 JSON |
+| `--progress auto\|always\|never` | 全局进度选项；默认 `auto`，`--json` 始终关闭进度 |
 | `--request-id ID` | 为支持追踪控制的请求设置关联标识 |
 | `--help` | 查看对应命令的语法帮助 |
 
 `--state` 和 `--resume` 不能同用，且都只支持单目标。配置了多个平台时，使用它们必须通过 `--target` 只选一个平台；配置仅有一个平台时可以省略选择参数。`deploy` 不再接受 `--file`、`--target-version`、`--update-type`、`--release-notes`、`--installer-source-url`；修改配置文件后重新试运行。
 
 所有成功结果写 stdout，诊断、配置日志和回调日志写 stderr。单命令失败输出结构化错误；多目标失败输出逐项目标结果，并以 `1` 退出。
+
+交互终端默认在 stderr 展示网络请求的等待动画和耗时；短于约 200ms 的普通请求不显示动画。上传显示 multipart 请求体的字节进度、百分比和速度，发送结束后继续等待服务端确认及资源校验。部署依次展示文件准备、上传或资源复用、草稿创建、发布和可选的分发任务状态；任务状态不代表客户端已安装。
+
+CI、非 TTY 和 `--json` 默认不输出新增进度。使用 `--progress always` 可在 CI 或重定向时输出无动画控制字符的阶段日志，上传日志最多每秒刷新一次，任务轮询仅在状态变化时输出；`--progress never` 关闭进度。配置、回调日志和错误仍按上述规则输出。
 
 <a id="recovery"></a>
 
@@ -702,6 +707,8 @@ const tasks = await app.tasks.list({ pageSize: 100 })
 `/node` 入口提供 `createPublisher`、`uploadArtifact` 和 `waitForTask`。Publisher 可在同一实例中复用同应用资源；`deployMany` 会在首次写请求前校验全部目标并准备文件，然后逐项目标执行。使用后在 `finally` 中调用 `publisher.close()` 清理临时 ZIP。
 
 Node SDK 仅在显式传入 `stateFile` 时写恢复状态，CLI 默认保存。SDK 参数与 CLI 配置互相独立，`DeployTarget` 需要传完整 `release`。
+
+HTTP SDK 支持可选的 `fetch` 参数以注入 Fetch 实现，以及 `onRequest(event)` 请求生命周期观察器。Publisher 支持 `onProgress(event)` 阶段和上传字节观察器，`waitForTask` 的第四个参数也支持 `onProgress`。SDK 默认保持静默，观察器异常不会改变操作结果。上传字节指进入请求流的数据，不表示服务端已确认接收；超时覆盖请求和响应体读取。
 
 ### Socket 更新通知
 

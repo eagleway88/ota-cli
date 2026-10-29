@@ -1,16 +1,9 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const axios = require('axios')
+const { capture, response } = require('../fixtures/http.cjs')
 const { createAppClient, OtaApiError, normalizeBaseURL } = require('../../dist/index.cjs')
 const { createManageClient } = require('../../dist/manage.cjs')
 const key = 'ota_ak_12345678-1234-4123-8123-123456789abc.' + 's'.repeat(43)
-const response = (config, data, status = 200) => ({
-  config,
-  data,
-  status,
-  statusText: 'OK',
-  headers: { 'x-request-id': 'trace-1' }
-})
 test('canonical API base URL has one explicit version prefix', () => {
   assert.equal(
     normalizeBaseURL('https://example.test/ota/api/v1/'),
@@ -25,28 +18,19 @@ test('canonical API base URL has one explicit version prefix', () => {
   ])
     assert.throws(() => normalizeBaseURL(value))
 })
-test('App and Manage entry points are separate and apps never inherit global axios credentials', async (t) => {
-  const previous = axios.defaults.headers.common.Authorization
-  const previousAuth = axios.defaults.auth
-  axios.defaults.auth = { username: 'global-user', password: 'global-password' }
-  axios.defaults.headers.common.Authorization = 'Bearer global-secret'
-  t.after(() => {
-    axios.defaults.auth = previousAuth
-    if (previous === undefined) delete axios.defaults.headers.common.Authorization
-    else axios.defaults.headers.common.Authorization = previous
-  })
+test('App and Manage requests use Fetch with isolated credentials and no automatic redirects', async () => {
   const calls = []
-  const adapter = async (config) => {
-    calls.push(config)
-    return response(config, { code: 0, data: null })
+  const fetch = async (url, init) => {
+    calls.push(capture(url, init))
+    return response({ code: 0, data: null })
   }
-  const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a', adapter })
+  const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a', fetch })
   assert.equal(app.admin, undefined)
   assert.equal(app.releases, undefined)
   assert.equal(await app.checkUpdate({ platform: 'windows', currentVersion: '1.3.10' }), null)
-  assert.equal(calls[0].headers.get('Authorization'), undefined)
-  assert.equal(calls[0].auth, undefined)
-  assert.equal(calls[0].url, 'app/apps/app-a/updates/check')
+  assert.equal(calls[0].headers.get('Authorization'), null)
+  assert.equal(calls[0].credentials, 'omit')
+  assert.equal(calls[0].url, 'https://example.test/api/v1/app/apps/app-a/updates/check')
   assert.throws(
     () => createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'a', accessKey: key }),
     /must not receive/
@@ -63,12 +47,12 @@ test('App and Manage entry points are separate and apps never inherit global axi
   const manage = createManageClient({
     baseURL: 'https://example.test/api/v1',
     accessKey: key,
-    adapter
+    fetch
   })
   await manage.forApp('app-b').releases.list()
   assert.equal(calls[1].headers.get('Authorization'), 'Bearer ' + key)
-  assert.equal(calls[1].maxRedirects, 0)
-  assert.equal(calls[1].url, 'manage/apps/app-b/releases')
+  assert.equal(calls[1].redirect, 'manual')
+  assert.equal(calls[1].url, 'https://example.test/api/v1/manage/apps/app-b/releases')
 })
 test('strict inputs use numbers and exact app context', () => {
   const app = createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'app-a' })
@@ -88,20 +72,14 @@ test('strict inputs use numbers and exact app context', () => {
 })
 test('HTTP failures preserve status, code and trace, redact credentials and never retry', async () => {
   let calls = 0
-  const adapter = async (config) => {
+  const fetch = async () => {
     calls++
-    throw new axios.AxiosError(
-      'rejected',
-      'ERR_BAD_REQUEST',
-      config,
-      undefined,
-      response(config, { code: 403, message: 'denied ' + key }, 403)
-    )
+    return response({ code: 403, message: 'denied ' + key }, 403)
   }
   const manage = createManageClient({
     baseURL: 'https://example.test/api/v1',
     accessKey: key,
-    adapter
+    fetch
   })
   await assert.rejects(manage.forApp('a').releases.list(), (error) => {
     assert.ok(error instanceof OtaApiError)
@@ -122,11 +100,84 @@ test('invalid envelopes fail closed, business errors retain their metadata', asy
     const app = createAppClient({
       baseURL: 'https://example.test/api/v1',
       appName: 'a',
-      adapter: async (config) => response(config, payload)
+      fetch: async () => response(payload)
     })
     await assert.rejects(
       app.checkUpdate({ platform: 'ios', currentVersion: '1.0.0' }),
       (error) => error.code === code && error.status === 200
     )
   }
+})
+
+test('request events exclude credentials and observers cannot change a successful response', async () => {
+  const events = []
+  const manage = createManageClient({
+    baseURL: 'https://example.test/api/v1',
+    accessKey: key,
+    fetch: async (url) => {
+      assert.equal(new URL(url).searchParams.get('status'), 'published')
+      return response({ code: 0, data: [] })
+    },
+    onRequest: (event) => {
+      events.push(event)
+      if (event.phase === 'start') throw new Error('observer failed')
+      return Promise.reject(new Error('async observer failed'))
+    }
+  })
+  assert.deepEqual(await manage.forApp('a').releases.list({ status: 'published' }), [])
+  assert.deepEqual(
+    events.map((event) => event.phase),
+    ['start', 'success']
+  )
+  assert.equal(events[0].id, events[1].id)
+  assert.ok(events[1].elapsedMs >= 0)
+  assert.ok(!JSON.stringify(events).includes(key))
+  assert.ok(!JSON.stringify(events).includes('published'))
+})
+
+test('non-JSON responses preserve HTTP errors and successful malformed JSON is a protocol error', async () => {
+  for (const status of [200, 503]) {
+    const manage = createManageClient({
+      baseURL: 'https://example.test/api/v1',
+      accessKey: key,
+      fetch: async () =>
+        new Response('<html>unavailable</html>', {
+          status,
+          headers: { 'x-request-id': 'html-trace' }
+        })
+    })
+    await assert.rejects(
+      manage.forApp('a').releases.list(),
+      (error) =>
+        error.status === status &&
+        error.requestId === 'html-trace' &&
+        error.kind === (status === 200 ? 'protocol' : 'api')
+    )
+  }
+})
+
+test('network errors remain redacted and emit a terminal error event without retries', async () => {
+  const events = []
+  let calls = 0
+  const manage = createManageClient({
+    baseURL: 'https://example.test/api/v1',
+    accessKey: key,
+    fetch: async () => {
+      calls++
+      throw new Error('network ' + key)
+    },
+    onRequest: (event) => events.push(event)
+  })
+  await assert.rejects(
+    manage.forApp('a').releases.list(),
+    (error) =>
+      error.kind === 'network' &&
+      !error.message.includes(key) &&
+      error.message.includes('[REDACTED]')
+  )
+  assert.equal(calls, 1)
+  assert.deepEqual(
+    events.map((event) => event.phase),
+    ['start', 'error']
+  )
 })

@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import FormData from 'form-data'
+import { Readable, Transform } from 'node:stream'
 import type {
   Artifact,
   DraftInput,
@@ -10,16 +11,20 @@ import type {
   RequestControl,
   TaskDetail
 } from '../contracts'
-import { appName, draftInput } from '../contracts/validation'
+import { appName, draftInput, text } from '../contracts/validation'
 import { createManageClient } from '../manage'
 import { createTransport, normalizeBaseURL, OtaApiError } from '../transport/http'
 import { prepareSource, type PreparedSource } from './source'
 import { fingerprint, stateSession, type DeploymentState } from './state'
+import { emit } from '../transport/events'
+import type { PublisherProgressEvent, WaitOptions } from './progress'
 
 /** Node 发布器连接设置；API Key 应由受控环境注入。 */
 export interface PublisherOptions extends ManageOptions {
   /** 单次 ZIP 上传超时，单位毫秒，默认 150000；普通请求使用 timeout。 */
   uploadTimeout?: number
+  /** 可选阶段和上传进度观察器；默认不输出，观察器异常不会影响发布。 */
+  onProgress?: (event: PublisherProgressEvent) => void
 }
 /** Node SDK 的一个部署输入；CLI 会从配置中的目标生成此对象。 */
 export interface DeployTarget {
@@ -78,51 +83,64 @@ export async function waitForTask(
   options: ManageOptions,
   app: string,
   taskId: string,
-  settings: { timeout?: number; pollInterval?: number; signal?: AbortSignal } = {}
+  settings: WaitOptions = {}
 ): Promise<TaskDetail> {
   appName(app)
+  text(taskId, 'taskId')
   const timeout = settings.timeout ?? 300000,
     interval = settings.pollInterval ?? 1000
   if (!Number.isFinite(timeout) || timeout <= 0 || !Number.isFinite(interval) || interval <= 0)
     throw new Error('Polling timeout and interval must be positive')
+  const report = (event: Omit<PublisherProgressEvent, 'appName'>) =>
+    emit(settings.onProgress, { ...event, appName: app })
   const deadline = Date.now() + timeout
-  while (Date.now() < deadline) {
-    if (settings.signal?.aborted) throw new Error('Task wait aborted; release remains published')
-    const request = createTransport(
-      {
-        ...options,
-        timeout: Math.max(1, Math.min(options.timeout ?? 15000, deadline - Date.now()))
-      },
-      options.accessKey
-    )
-    const detail = await request<TaskDetail>(
-      'GET',
-      'manage/apps/' + encodeURIComponent(app) + '/tasks/' + encodeURIComponent(taskId),
-      undefined,
-      undefined,
-      { signal: settings.signal }
-    )
-    if (detail.task.status === 'succeeded') return detail
-    if (detail.task.status === 'failed')
-      throw new Error('Dispatch task failed; release remains published: ' + taskId)
-    await new Promise<void>((resolve, reject) => {
-      const aborted = () => {
-        clearTimeout(timer)
-        settings.signal?.removeEventListener('abort', aborted)
-        reject(new Error('Task wait aborted; release remains published'))
-      }
-      const timer = setTimeout(
-        () => {
-          settings.signal?.removeEventListener('abort', aborted)
-          resolve()
+  report({ phase: 'waiting' })
+  try {
+    while (Date.now() < deadline) {
+      if (settings.signal?.aborted) throw new Error('Task wait aborted; release remains published')
+      const request = createTransport(
+        {
+          ...options,
+          timeout: Math.max(1, Math.min(options.timeout ?? 15000, deadline - Date.now()))
         },
-        Math.min(interval, Math.max(0, deadline - Date.now()))
+        options.accessKey
       )
-      settings.signal?.addEventListener('abort', aborted, { once: true })
-      if (settings.signal?.aborted) aborted()
-    })
+      const detail = await request<TaskDetail>(
+        'GET',
+        'manage/apps/' + encodeURIComponent(app) + '/tasks/' + encodeURIComponent(taskId),
+        undefined,
+        undefined,
+        { signal: settings.signal, requestId: settings.requestId }
+      )
+      report({ phase: 'task', taskStatus: detail.task.status })
+      if (detail.task.status === 'succeeded') {
+        report({ phase: 'completed' })
+        return detail
+      }
+      if (detail.task.status === 'failed')
+        throw new Error('Dispatch task failed; release remains published: ' + taskId)
+      await new Promise<void>((resolve, reject) => {
+        const aborted = () => {
+          clearTimeout(timer)
+          settings.signal?.removeEventListener('abort', aborted)
+          reject(new Error('Task wait aborted; release remains published'))
+        }
+        const timer = setTimeout(
+          () => {
+            settings.signal?.removeEventListener('abort', aborted)
+            resolve()
+          },
+          Math.min(interval, Math.max(0, deadline - Date.now()))
+        )
+        settings.signal?.addEventListener('abort', aborted, { once: true })
+        if (settings.signal?.aborted) aborted()
+      })
+    }
+    throw new Error('Task wait timed out; release remains published: ' + taskId)
+  } catch (error) {
+    report({ phase: 'failed' })
+    throw error
   }
-  throw new Error('Task wait timed out; release remains published: ' + taskId)
 }
 export function createPublisher(options: PublisherOptions) {
   const baseURL = normalizeBaseURL(options.baseURL)
@@ -133,14 +151,25 @@ export function createPublisher(options: PublisherOptions) {
   )
   const sources = new Map<string, Promise<PreparedSource>>()
   const artifacts = new Map<string, Promise<Artifact>>()
+  const report = (event: PublisherProgressEvent) => emit(options.onProgress, event)
   let closed = false
   const ensureOpen = () => {
     if (closed) throw new Error('Publisher is closed')
   }
-  const prepare = async (file: string) => {
+  type Scope = Pick<PublisherProgressEvent, 'appName' | 'target'>
+  const prepare = async (file: string, scope: Scope) => {
     ensureOpen()
     const canonical = await realpath(file)
-    if (!sources.has(canonical)) sources.set(canonical, prepareSource(canonical))
+    if (!sources.has(canonical)) {
+      report({ ...scope, phase: 'preparing' })
+      sources.set(
+        canonical,
+        prepareSource(canonical, (phase) => report({ ...scope, phase })).then((source) => {
+          report({ ...scope, phase: 'prepared' })
+          return source
+        })
+      )
+    }
     return sources.get(canonical)!
   }
   const validate = (target: DeployTarget) => {
@@ -155,10 +184,16 @@ export function createPublisher(options: PublisherOptions) {
       target.appName
     )
   }
-  const uploadPrepared = async (app: string, source: PreparedSource, control?: RequestControl) => {
+  const uploadPrepared = async (
+    app: string,
+    source: PreparedSource,
+    control?: RequestControl,
+    scope: Scope = { appName: app }
+  ) => {
     ensureOpen()
     appName(app)
     const key = JSON.stringify([baseURL, app, source.checksumSha256])
+    if (artifacts.has(key)) report({ ...scope, phase: 'reused' })
     if (!artifacts.has(key))
       artifacts.set(
         key,
@@ -170,14 +205,39 @@ export function createPublisher(options: PublisherOptions) {
             contentType: 'application/zip',
             knownLength: source.sizeBytes
           })
+          let loaded = 0
+          let total = 0
+          const body = new Transform({
+            transform(chunk: Buffer, _encoding, callback) {
+              loaded += chunk.length
+              report({ ...scope, phase: 'uploading', loaded, total })
+              callback(null, chunk)
+            },
+            flush(callback) {
+              report({ ...scope, phase: 'upload-sent', loaded, total })
+              callback()
+            }
+          })
+          const webBody = Readable.toWeb(body, {
+            strategy: { highWaterMark: 1 }
+          }) as ReadableStream<Uint8Array>
+          const failed = (error: Error) => body.destroy(error)
+          stream.on('error', failed)
+          form.on('error', failed)
           try {
+            total = await new Promise<number>((resolve, reject) =>
+              form.getLength((error, length) => (error ? reject(error) : resolve(length)))
+            )
+            report({ ...scope, phase: 'uploading', loaded, total })
+            form.pipe(body)
             const result = await upload<Artifact>(
               'POST',
               'manage/apps/' + encodeURIComponent(app) + '/artifacts',
-              form,
+              undefined,
               undefined,
               control,
-              form.getHeaders()
+              { ...form.getHeaders(), 'content-length': String(total) },
+              webBody
             )
             if (
               !result ||
@@ -188,8 +248,11 @@ export function createPublisher(options: PublisherOptions) {
               throw new Error(
                 'Uploaded artifact metadata does not match the local ZIP; verify server state'
               )
+            report({ ...scope, phase: 'uploaded' })
             return result
           } finally {
+            form.destroy()
+            body.destroy()
             stream.destroy()
           }
         })()
@@ -199,12 +262,20 @@ export function createPublisher(options: PublisherOptions) {
   const api = {
     async uploadArtifact(app: string, file: string, control?: RequestControl) {
       appName(app)
-      return uploadPrepared(app, await prepare(file), control)
+      try {
+        const result = await uploadPrepared(app, await prepare(file, { appName: app }), control)
+        report({ appName: app, phase: 'completed' })
+        return result
+      } catch (error) {
+        report({ appName: app, phase: 'failed' })
+        throw error
+      }
     },
     async deploy(target: DeployTarget, settings: DeployOptions = {}): Promise<DeploymentResult> {
       ensureOpen()
       validate(target)
-      const source = target.file ? await prepare(target.file) : undefined
+      const scope = { appName: target.appName, target: target.release.platforms.join(',') }
+      const source = target.file ? await prepare(target.file, scope) : undefined
       const intentHash = fingerprint(
         { appName: target.appName, release: target.release },
         source?.checksumSha256,
@@ -277,12 +348,14 @@ export function createPublisher(options: PublisherOptions) {
             JSON.stringify([baseURL, target.appName, source.checksumSha256]),
             Promise.resolve(state.artifact)
           )
+          report({ ...scope, phase: 'reused' })
         }
+        if (settings.resume) report({ ...scope, phase: 'resuming', resumePhase: state.phase })
         await session.save(state)
         if (source && !state.artifact) {
           state.phase = 'uploading'
           await session.save(state)
-          state.artifact = await uploadPrepared(target.appName, source, settings)
+          state.artifact = await uploadPrepared(target.appName, source, settings, scope)
           state.phase = 'uploaded'
           await session.save(state)
         }
@@ -292,21 +365,25 @@ export function createPublisher(options: PublisherOptions) {
         if (!state.releaseId) {
           state.phase = 'creating'
           await session.save(state)
+          report({ ...scope, phase: 'creating' })
           const draft = await manage
             .forApp(target.appName)
             .releases.create(input, { ...settings, idempotencyKey: state.idempotencyKey })
           state.releaseId = draft.releaseId
           state.phase = 'draft'
           await session.save(state)
+          report({ ...scope, phase: 'draft' })
         }
         if (!state.publication) {
           state.phase = 'publishing'
           await session.save(state)
+          report({ ...scope, phase: 'publishing' })
           state.publication = await manage
             .forApp(target.appName)
             .releases.publish(state.releaseId, settings)
           state.phase = 'published'
           await session.save(state)
+          report({ ...scope, phase: 'published' })
           try {
             await settings.onPublished?.(state.publication)
           } catch {
@@ -329,11 +406,18 @@ export function createPublisher(options: PublisherOptions) {
           result.task = await waitForTask(options, state.appName, result.taskId, {
             timeout: settings.waitTimeout,
             pollInterval: settings.pollInterval,
-            signal: settings.signal
+            signal: settings.signal,
+            requestId: settings.requestId,
+            onProgress: (event) => {
+              if (event.phase !== 'completed' && event.phase !== 'failed')
+                report({ ...event, ...scope })
+            }
           })
         }
+        report({ ...scope, phase: 'completed' })
         return result
       } catch (error) {
+        report({ ...scope, phase: 'failed' })
         try {
           await settings.onError?.(error)
         } catch {
@@ -357,7 +441,7 @@ export function createPublisher(options: PublisherOptions) {
       // Validate and prepare every target before the first write request.
       for (const target of targets) {
         validate(target)
-        if (target.file) await prepare(target.file)
+        if (target.file) await prepare(target.file, { appName: target.appName })
       }
       const results: Array<{
         appName: string
@@ -365,6 +449,13 @@ export function createPublisher(options: PublisherOptions) {
         error?: DeploymentError
       }> = []
       for (const [index, target] of targets.entries()) {
+        report({
+          phase: 'target',
+          appName: target.appName,
+          target: target.release.platforms.join(','),
+          index: index + 1,
+          count: targets.length
+        })
         try {
           results.push({
             appName: target.appName,

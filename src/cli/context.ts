@@ -6,14 +6,10 @@ import { validateAccessKey } from '../transport/http'
 import type { PublisherOptions } from '../node/publisher'
 import { appName, integer } from '../contracts/validation'
 import { loadConfig, type OtaCliConfig } from './config'
+import { secrets } from './output/redact'
+import { ProgressDisplay, type ProgressMode } from './output/progress'
 
 export type CliOptions = Record<string, string | boolean | undefined>
-export const secrets = new Set<string>()
-export function redact(value: string) {
-  let result = value.replace(/ota_ak_[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}/g, '[REDACTED]')
-  for (const secret of secrets) result = result.split(secret).join('[REDACTED]')
-  return result
-}
 export function numberOption(value: unknown, label: string, min = 0) {
   const parsed = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value
   integer(parsed, label, min)
@@ -29,6 +25,14 @@ export async function jsonFile(file: string): Promise<unknown> {
 }
 export async function context(command: Command) {
   const args = command.optsWithGlobals<CliOptions>()
+  const names: string[] = []
+  for (let current: Command | null = command; current?.parent; current = current.parent)
+    names.unshift(current.name())
+  const progress = new ProgressDisplay(
+    (args.progress ?? 'auto') as ProgressMode,
+    Boolean(args.json),
+    names.join(' ')
+  )
   const { config, directory } = await loadConfig()
   const baseURL = String(config.baseURL ?? '')
   if (!baseURL) throw new Error('baseURL is required in ota-cli.config')
@@ -43,10 +47,28 @@ export async function context(command: Command) {
     validateAccessKey(accessKey)
     secrets.add(accessKey)
     if (accessKey.includes('.')) secrets.add(accessKey.split('.')[1])
-    return { baseURL, timeout, uploadTimeout, accessKey }
+    return {
+      baseURL,
+      timeout,
+      uploadTimeout,
+      accessKey,
+      onRequest: progress.onRequest,
+      onProgress: progress.onProgress
+    }
   }
   const manage = () => createManageClient(credentials()).forApp(resolveApp())
-  return { args, config, directory, baseURL, timeout, control, resolveApp, credentials, manage }
+  return {
+    args,
+    config,
+    directory,
+    baseURL,
+    timeout,
+    control,
+    resolveApp,
+    credentials,
+    manage,
+    progress
+  }
 }
 export type CliContext = Awaited<ReturnType<typeof context>>
 export type CliConfig = OtaCliConfig

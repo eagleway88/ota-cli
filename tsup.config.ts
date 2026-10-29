@@ -9,7 +9,7 @@ export default defineConfig([
       node: 'src/node.ts'
     },
     format: ['esm', 'cjs'],
-    external: ['axios', 'archiver', 'form-data', 'jiti', 'commander', 'socket.io-client'],
+    external: ['archiver', 'form-data', 'jiti', 'commander', 'socket.io-client'],
     dts: true,
     sourcemap: true,
     clean: false,
@@ -21,7 +21,7 @@ export default defineConfig([
       cli: 'src/cli.ts'
     },
     format: ['cjs'],
-    external: ['axios', 'archiver', 'form-data', 'jiti', 'commander', 'socket.io-client'],
+    external: ['archiver', 'form-data', 'jiti', 'commander', 'socket.io-client'],
     dts: false,
     sourcemap: true,
     clean: false,

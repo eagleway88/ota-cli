@@ -8,13 +8,9 @@ import type {
   TimeQuery
 } from '../../contracts'
 import { waitForTask } from '../../node/publisher'
-import { context, numberOption, type CliContext } from '../context'
-import { result } from '../output'
+import { numberOption, type CliContext } from '../context'
+import { action } from '../action'
 
-function action(command: Command, handler: (ctx: CliContext) => Promise<unknown>) {
-  command.action(async (_options, cmd: Command) => result(await handler(await context(cmd))))
-  return command
-}
 function timeOptions(command: Command, paginated = true) {
   command.option('--from <iso>').option('--to <iso>')
   if (paginated) command.option('--page <number>').option('--page-size <number>')
@@ -82,6 +78,8 @@ export function registerQueries(program: Command) {
       .option('--poll-interval <ms>'),
     (ctx) =>
       waitForTask(ctx.credentials(), ctx.resolveApp(), String(ctx.args.id), {
+        ...ctx.control,
+        onProgress: ctx.progress.onProgress,
         timeout:
           ctx.args.waitTimeout !== undefined
             ? numberOption(ctx.args.waitTimeout, 'waitTimeout', 1)

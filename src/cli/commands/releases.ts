@@ -5,13 +5,10 @@ import { Command } from 'commander'
 import type { DraftInput, Platform } from '../../contracts'
 import { draftInput, object, platform } from '../../contracts/validation'
 import { createPublisher } from '../../node/publisher'
-import { context, jsonFile, numberOption, type CliContext } from '../context'
-import { result, errorResult, progress, withHookOutput } from '../output'
+import { jsonFile, numberOption, type CliContext } from '../context'
+import { errorResult, progress, withHookOutput } from '../output'
+import { action } from '../action'
 
-function action(command: Command, handler: (ctx: CliContext) => Promise<unknown>) {
-  command.action(async (_options, cmd: Command) => result(await handler(await context(cmd))))
-  return command
-}
 function target(ctx: CliContext, name: Platform) {
   const configured = ctx.config.targets?.[name]
   if (!configured) throw new Error('Unknown release target: ' + name)
@@ -190,6 +187,14 @@ export function registerReleases(program: Command) {
         }
         return { dryRun: true, targets }
       }
+      const waitTimeout =
+        ctx.args.waitTimeout !== undefined
+          ? numberOption(ctx.args.waitTimeout, 'waitTimeout', 1)
+          : undefined
+      const pollInterval =
+        ctx.args.pollInterval !== undefined
+          ? numberOption(ctx.args.pollInterval, 'pollInterval', 1)
+          : undefined
       const publisher = createPublisher(ctx.credentials())
       try {
         const entries = await publisher.deployMany(targets, () => ({
@@ -201,14 +206,8 @@ export function registerReleases(program: Command) {
               : path.join(process.cwd(), '.ota-cli', 'deployments', randomUUID() + '.json'),
           resume: Boolean(ctx.args.resume),
           wait: Boolean(ctx.args.wait),
-          waitTimeout:
-            ctx.args.waitTimeout !== undefined
-              ? numberOption(ctx.args.waitTimeout, 'waitTimeout', 1)
-              : undefined,
-          pollInterval:
-            ctx.args.pollInterval !== undefined
-              ? numberOption(ctx.args.pollInterval, 'pollInterval', 1)
-              : undefined,
+          waitTimeout,
+          pollInterval,
           onPublished: async (publication) =>
             withHookOutput(async () => {
               await ctx.config.onPublished?.(publication)

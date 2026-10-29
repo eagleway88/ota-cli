@@ -1,8 +1,8 @@
 import { Command } from 'commander'
 import type { JsonValue } from '../../contracts'
 import { jsonValue } from '../../contracts/validation'
-import { context, jsonFile, type CliContext } from '../context'
-import { result } from '../output'
+import { jsonFile, type CliContext } from '../context'
+import { action } from '../action'
 
 async function data(ctx: CliContext): Promise<JsonValue | undefined> {
   if (ctx.args.data !== undefined && ctx.args.dataFile !== undefined)
@@ -15,9 +15,6 @@ async function data(ctx: CliContext): Promise<JsonValue | undefined> {
         : undefined
   if (value !== undefined) jsonValue(value)
   return value as JsonValue | undefined
-}
-function action(command: Command, handler: (ctx: CliContext) => Promise<unknown>) {
-  command.action(async (_options, cmd: Command) => result(await handler(await context(cmd))))
 }
 function dataOptions(command: Command) {
   return command.option('--data <json>').option('--data-file <path>')

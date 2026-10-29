@@ -1,4 +1,4 @@
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import { version } from '../../package.json'
 import { registerReleases } from './commands/releases'
 import { registerApp } from './commands/app'
@@ -13,6 +13,11 @@ export async function run(argv = process.argv) {
     .version(version)
     .option('--request-id <id>')
     .option('--json', 'Results use stdout JSON; diagnostics use stderr')
+    .addOption(
+      new Option('--progress <mode>', 'Progress on stderr (JSON mode disables progress)')
+        .choices(['auto', 'always', 'never'])
+        .default('auto')
+    )
   registerReleases(program)
   registerApp(program)
   registerMessages(program)
