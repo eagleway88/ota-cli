@@ -13,12 +13,13 @@ createAppClient({
   }
 })
 void client.checkUpdate({ platform: 'windows', currentVersion: '1.3.10' })
+void client.checkUpdate({ platform: 'web', currentVersion: '1.3.10' })
 // @ts-expect-error App clients do not accept a management key.
 createAppClient({ baseURL: 'https://example.test/api/v1', appName: 'desktop', accessKey: 'secret' })
 // @ts-expect-error Installation reports require a release sequence.
 client.reportSuccess({ platform: 'windows', version: '1.3.10' })
 const result: Partial<Release> = { bundleUrl: null, mandatory: false }
-const config: OtaCliConfig = { targets: { windows: {}, macos: {}, linux: {} } }
+const config: OtaCliConfig = { targets: { web: {}, windows: {}, macos: {}, linux: {} } }
 // @ts-expect-error CLI targets must use known platform names.
 const invalidTargets: OtaCliConfig = { targets: { desktop: {} } }
 // @ts-expect-error The target key determines the platform.

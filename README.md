@@ -91,10 +91,10 @@ export function checkForUpdate(installedReleaseSequence: number) {
 
 | 字段 | 客户端如何使用 |
 | --- | --- |
-| `updateType` | `hot` 走热更新资源流程；`full` 走原生安装包更新流程 |
+| `updateType` | `hot` 走热更新资源流程；`full` 走原生安装包更新或 Web 页面刷新流程 |
 | `bundleUrl` | 热更新资源下载地址 |
 | `installerSourceUrl` | 全量安装包地址 |
-| `targetVersion` | 发布配置中的目标原生版本 |
+| `targetVersion` | 发布配置中的目标原生版本或 Web 构建版本 |
 | `releaseSequence` | 此次发布的序号；实际加载成功后保存 |
 | `releaseNotes` | 展示更新内容 |
 | `mandatory` / `showUpdateDialog` | 供应用决定更新交互，SDK 不自动弹框 |
@@ -163,7 +163,7 @@ export default {
 
 `defaults` 提供所有目标共用的发布字段，`targets.windows` 提供 Windows 的字段；同名字段以目标为准，数组会整体替换。适用平台由键 `windows` 推导，不在 `defaults` 或目标内填写 `platforms`。
 
-`targets` 只允许 `windows`、`macos`、`linux`、`android`、`ios` 五种键。`desktop` 是本例的应用标识，不能作为目标键；架构和渠道分别写入 `architectures`、`distributionChannel`，不拼进目标名称。
+`targets` 只允许 `windows`、`macos`、`linux`、`android`、`ios`、`web` 六种键。`desktop` 是本例的应用标识，不能作为目标键；架构和渠道分别写入 `architectures`、`distributionChannel`，不拼进目标名称。
 
 **省略 `--target` 时发布配置中的全部平台；提供 `--target windows` 时只选择 `targets.windows`。** 终端不能创建新目标、覆盖版本或替换源文件。
 
@@ -358,7 +358,7 @@ CLI 只在**当前执行目录**中按 `ota-cli.config.ts`、`.js`、`.mjs`、`.
 
 | 字段 | 含义 |
 | --- | --- |
-| `targetVersion` | 必填；三段数字原生版本，例如 `1.3.10`，不支持 `v1.3.10`、`1.3.10-beta` |
+| `targetVersion` | 必填；三段数字原生版本或 Web 构建版本，例如 `1.3.10`，不支持 `v1.3.10`、`1.3.10-beta` |
 | 适用平台 | 由 `targets` 的键自动生成；配置中不填写 `platforms` |
 | `updateType` | 必填；`hot` 或 `full` |
 | `releaseScope` | 必填；`public` 或 `allowlist` |
@@ -372,7 +372,7 @@ CLI 只在**当前执行目录**中按 `ota-cli.config.ts`、`.js`、`.mjs`、`.
 | `releaseNotes` | 更新说明 |
 | `mandatory` / `showUpdateDialog` | 更新交互标记，具体交互由客户端实现 |
 
-除自动推导的平台外，必填发布字段可放在 `defaults` 或目标中，合并后齐全即可。`file` 不能与 `artifactId`、`bundleUrl`、`installerSourceUrl` 同时配置。`hot` 需要热更新资源，`full` 需要原生安装包资源或地址。直接使用 SDK 或 `release create --input` 时仍需在 `DraftInput` 中显式提供 `platforms` 数组。
+除自动推导的平台外，必填发布字段可放在 `defaults` 或目标中，合并后齐全即可。`file` 不能与 `artifactId`、`bundleUrl`、`installerSourceUrl` 同时配置。`hot` 需要热更新资源，原生平台的 `full` 需要安装包资源或地址；仅 `web` 平台的 `full` 可省略所有资源。直接使用 SDK 或 `release create --input` 时仍需在 `DraftInput` 中显式提供 `platforms` 数组。
 
 公开类型从 `@eagleway/ota-cli` 导出协议类型；配置、发布器类型从 `@eagleway/ota-cli/node` 导出。类型及字段含 JSDoc 注释，可在编辑器悬停查看。
 
@@ -533,6 +533,64 @@ const windows: ReleaseTarget = {
 ~~~bash
 pnpm exec ota-cli app check --platform windows --current-version 1.3.10 --installed-release-sequence 0 --architecture x64 --distribution-channel beta --user-id desktop:windows:42
 ~~~
+
+### Web 网页刷新提醒
+
+网页使用平台 `web`，每次构建递增三段数字版本，例如从 `1.3.10` 到 `1.3.11`。发布使用 `full`：仅面向 Web 时无需配置 `file`、`artifactId` 或下载地址，也不会上传 ZIP。
+
+~~~ts
+import type { OtaCliConfig } from '@eagleway/ota-cli/node'
+
+export default {
+  baseURL: 'https://ota.example.com/api/v1',
+  appName: 'website',
+  targets: {
+    web: {
+      targetVersion: '1.3.11',
+      updateType: 'full',
+      releaseScope: 'public',
+      userIds: [],
+      mandatory: false,
+      showUpdateDialog: true,
+      releaseNotes: '页面已更新，请刷新后使用。'
+    }
+  }
+} satisfies OtaCliConfig
+~~~
+
+先部署新网页，再运行 `pnpm exec ota-cli release deploy --target web --wait` 发布通知。客户端根入口已支持浏览器，不需要新增 SDK 入口：
+
+~~~ts
+import { createAppClient, type Release } from '@eagleway/ota-cli'
+
+const ota = createAppClient({
+  baseURL: 'https://ota.example.com/api/v1',
+  appName: 'website'
+})
+
+// 在构建时注入，必须代表当前实际加载的 JS 产物版本。
+const currentVersion = '1.3.10'
+
+function handleUpdate(release: Release | null) {
+  if (!release?.enabled) return
+  if (release.mandatory) {
+    window.alert(release.releaseNotes || '页面已更新，确认后刷新。')
+    location.reload()
+    return
+  }
+  if (release.showUpdateDialog && window.confirm(release.releaseNotes || '页面已更新，是否刷新？')) {
+    location.reload()
+  }
+}
+
+handleUpdate(await ota.checkUpdate({ platform: 'web', currentVersion }))
+~~~
+
+示例使用浏览器原生提示框；业务可替换为自己的弹窗组件，强制更新时需阻止继续操作并提供刷新按钮。SDK 不自动渲染或刷新。实时通知复用下文 Socket 接口：`onUpdate('website', handleUpdate)`，并以 `{ appName: 'website', platform: 'web', currentVersion }` 订阅。API 和 Socket 可通过网页同源代理访问。
+
+目标版本必须高于当前页面版本；刷新实际加载 `1.3.11` 后不会再次提示同一发布。不要在确认弹窗或刷新前把待更新版本写成当前版本；网页 HTML 与缓存策略应确保刷新可以加载新构建。`installedReleaseSequence` 不替代 Web 构建版本。
+
+资源豁免只适用于仅包含 Web 的 `full` 发布；混合原生平台的发布和 Web 的 `hot` 仍要求更新资源。
 
 ### 全量安装包更新
 
@@ -763,7 +821,7 @@ await ws.subscribeApp({
 | --- | --- |
 | 不带 `--target` 会发到哪里？ | 发布 `targets` 中全部已配置平台；不会自动添加未配置的平台 |
 | `--target windows` 是在终端定义目标吗？ | 不是。它选择配置中已有的 `targets.windows` |
-| `Unknown target platform` | 配置键只能是 `windows/macos/linux/android/ios`，不能使用 `desktop` 或架构/渠道组合 |
+| `Unknown target platform` | 配置键只能是 `windows/macos/linux/android/ios/web`，不能使用 `desktop` 或架构/渠道组合 |
 | `Unknown release target` | 指定的平台未在 `targets` 中配置 |
 | `No release targets configured` | 配置中没有可发布目标，先填写 `targets` |
 | `Unknown fields: platforms` | 从 `defaults` 和平台目标中移除该字段；CLI 从目标键推导平台 |

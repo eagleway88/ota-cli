@@ -101,7 +101,7 @@ test('deploy uses defaults and target configuration and rejects release override
 
 test('CLI infers each known platform and preserves explicit platform selection order', async (t) => {
   const f = await fixture(t)
-  const platforms = ['windows', 'macos', 'linux', 'android', 'ios']
+  const platforms = ['windows', 'macos', 'linux', 'android', 'ios', 'web']
   await writeConfig(f, {
     defaults: {
       targetVersion: '1.3.10',

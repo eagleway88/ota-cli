@@ -160,11 +160,13 @@ export function draftInput(input: DraftInput, app: string) {
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
         throw new Error('Invalid ' + key)
     }
-  if (!input.artifactId && !input.bundleUrl && !input.installerSourceUrl)
+  const webRefresh =
+    input.updateType === 'full' && input.platforms.every((value) => value === 'web')
+  if (!webRefresh && !input.artifactId && !input.bundleUrl && !input.installerSourceUrl)
     throw new Error('A release artifact or URL is required')
   if (input.updateType === 'hot' && !input.artifactId && !input.bundleUrl)
     throw new Error('Hot updates require artifactId or bundleUrl')
-  if (input.updateType === 'full' && !input.artifactId && !input.installerSourceUrl)
+  if (input.updateType === 'full' && !webRefresh && !input.artifactId && !input.installerSourceUrl)
     throw new Error('Full updates require artifactId or installerSourceUrl')
 }
 

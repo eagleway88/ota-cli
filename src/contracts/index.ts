@@ -1,8 +1,8 @@
 /** 协议支持的平台名称；Windows/macOS 等系统名称需转换为这里的小写值。 */
-export const platforms = ['ios', 'android', 'windows', 'linux', 'macos'] as const
+export const platforms = ['ios', 'android', 'windows', 'linux', 'macos', 'web'] as const
 /** 客户端真实运行平台；发布目标名称与此类型无关。 */
 export type Platform = (typeof platforms)[number]
-/** hot 为同一原生版本内的资源热更新；full 为原生安装包更新。 */
+/** hot 为同一原生版本内的资源热更新；full 为原生安装包更新或 Web 页面刷新。 */
 export type UpdateType = 'hot' | 'full'
 /** public 面向符合条件的客户端；allowlist 还要求匹配 userIds。 */
 export type ReleaseScope = 'public' | 'allowlist'
@@ -56,7 +56,7 @@ export interface ManageOptions extends HttpOptions {
 export interface CheckInput {
   /** 客户端真实运行的平台。 */
   platform: Platform
-  /** 原生安装包的三段数字显示版本，例如 1.3.10；热更新不会改变它。 */
+  /** 三段数字显示版本，例如 1.3.10；Web 使用当前实际加载的构建版本。 */
   currentVersion: string
   /** 当前实际已加载的发布序号；从未安装 OTA 时传 0，勿填写 UUID 或待安装序号。 */
   installedReleaseSequence?: number
@@ -71,7 +71,7 @@ export interface CheckInput {
 export interface ReportInput {
   /** 发生安装或错误的实际平台。 */
   platform: Platform
-  /** 原生安装包显示版本，例如 1.3.10；不是发布序号。 */
+  /** 原生安装包或 Web 当前构建的显示版本，例如 1.3.10；不是发布序号。 */
   version: string
   /** 可选业务用户名，用于展示与排查。 */
   reportedUsername?: string | null
@@ -137,7 +137,7 @@ export interface AppErrorRecord extends AppErrorInput {
 }
 /** 创建草稿的完整内容；CLI deploy 合并配置后按目标键补入 platforms。 */
 export interface DraftInput {
-  /** 目标原生版本，例如 1.3.10；hot 必须等于客户端 currentVersion，full 应更高。 */
+  /** 目标原生或 Web 构建版本，例如 1.3.10；hot 必须等于 currentVersion，full 应更高。 */
   targetVersion: string
   /** 适用平台，至少一个；SDK 可指定多个，CLI deploy 则由单个平台目标的键生成。 */
   platforms: Platform[]
@@ -145,7 +145,7 @@ export interface DraftInput {
   architectures?: string[]
   /** 可选发布渠道，例如 stable；客户端需上报对应渠道。 */
   distributionChannel?: string
-  /** 更新方式：hot 使用资源包，full 使用原生安装包。 */
+  /** 更新方式：hot 使用资源包，full 使用原生安装包或刷新 Web 页面。 */
   updateType: UpdateType
   /** 必须显式选择 public 或 allowlist，避免隐式改变发布范围。 */
   releaseScope: ReleaseScope
@@ -155,7 +155,7 @@ export interface DraftInput {
   releaseNotes?: string
   /** 已上传资源的 ID；CLI/Publisher 提供 file 时会在上传后自动填入。 */
   artifactId?: string
-  /** full 更新的 HTTP(S) 安装包地址；CLI 不上传 APK/EXE/DMG 文件。 */
+  /** full 更新的 HTTP(S) 安装包地址；仅 Web 的 full 可省略所有资源。CLI 不上传 APK/EXE/DMG。 */
   installerSourceUrl?: string
   /** hot 更新的 HTTP(S) 资源包地址；使用已有 URL 时可省去上传。 */
   bundleUrl?: string
@@ -178,7 +178,7 @@ export interface Release
   releaseNotes?: string | null
   /** 资源大小，单位字节，未提供时可为空。 */
   artifactSizeBytes?: number | null
-  /** full 更新的安装包下载地址。 */
+  /** full 更新的安装包下载地址；仅 Web 的 full 可为空，由网页自行刷新。 */
   installerSourceUrl?: string | null
   /** hot 更新的资源包下载地址；应用自行下载、解压和加载。 */
   bundleUrl?: string | null
